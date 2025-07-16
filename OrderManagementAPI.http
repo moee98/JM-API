@@ -1,0 +1,6 @@
+@OrderManagementAPI_HostAddress = http://localhost:5114
+
+GET {{OrderManagementAPI_HostAddress}}/Models/Job/
+Accept: application/json
+
+###
