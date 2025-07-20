@@ -1,4 +1,5 @@
-﻿namespace JMAPI.Models
+﻿using Microsoft.AspNetCore.Identity;
+namespace JMAPI.Models
 {
     public class UserRole
     {

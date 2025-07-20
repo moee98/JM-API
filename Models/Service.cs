@@ -1,8 +1,8 @@
 ﻿namespace JMAPI.Models
 {
-    public class Service
+    public class Service 
     {
-        public int Id { get; set; }
+        public int Id { get; set; }  
         public required string Name { get; set; } // Name of the service
         public required string Description { get; set; } // Description of the service
         public float EstimatedPrice { get; set; } // Estimated price for the service

@@ -1,14 +1,17 @@
 ﻿using Azure.Core;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using JMAPI.Interfaces;
 using JMAPI.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace JMAPI.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class JobController : ControllerBase
@@ -22,9 +25,9 @@ namespace JMAPI.Controllers
 
         // GET: api/<JobController>
         [HttpGet]
-        public IActionResult Get()
+        public async Task<IActionResult> GetAsync()
         {
-            var jobs = _jobService.GetAllAsync();
+            var jobs = await _jobService.GetAllAsync();
             if (jobs !=null)
             {
                 return Ok(jobs);
@@ -37,17 +40,18 @@ namespace JMAPI.Controllers
         }
 
         // GET api/<JobController>/5
+       
         [HttpGet("{id}")]
-        public string Get(int id)
+        public async Task<IActionResult> GetId(int id)
         {
-            var jobs = _jobService.GetByIdAsync(id);
+            var jobs = await _jobService.GetByIdAsync(id);
             if (jobs != null)
             {
-                return jobs.ToString();
+                return Ok(jobs);
             }
             else
             {
-                return "No jobs found.";
+                return StatusCode(500);
             }
         }
 

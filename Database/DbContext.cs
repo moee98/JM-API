@@ -1,10 +1,13 @@
-﻿namespace JMAPI.Database
-{
-    using Microsoft.EntityFrameworkCore;
-    using JMAPI.Models;
-    using System;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using JMAPI.Models;
+using System;
 
-    public class AppDbContext : DbContext
+namespace JMAPI.Database
+{
+
+
+    public class AppDbContext : IdentityDbContext<AppUser>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {
         }
