@@ -2,9 +2,11 @@
 using JMAPI.Database;
 using JMAPI.Models;
 using JMAPI.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace JMAPI.Services
 {
+    [Authorize]
     public class JobService : IJobService
     {
         private readonly AppDbContext _context;
@@ -19,7 +21,17 @@ namespace JMAPI.Services
 
         public async Task<Job?> GetByIdAsync(int id) =>
             await _context.Jobs.FindAsync(id);
+        
+        public async Task<Vehicle?> GetVehicleAsync(int jobId) =>
+           await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Vehicle).Select(js => js.Vehicle).FirstOrDefaultAsync();
 
+        public async Task<Customer?> GetCustomerAsync(int jobId) =>
+           await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Customer).Select(js => js.Customer).FirstOrDefaultAsync();
+
+        public async Task<User?> GetUserAsync(int jobId) =>
+          await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.CreatedByUser).Select(js => js.CreatedByUser).FirstOrDefaultAsync();
+        public async Task<IList<Service?>> GetServicesAsync(int jobId) =>
+            await _context.JobServices.Where(x => x.JobId == jobId).Include(js => js.Service).Select(js => js.Service).ToListAsync();
         public async Task<Job> CreateAsync(Job item)
         {
             if(item.CustomerId>0)
@@ -38,6 +50,7 @@ namespace JMAPI.Services
             await _context.SaveChangesAsync();
             return item;
         }
+
 
         public async Task<bool> UpdateAsync(Job item)
         {

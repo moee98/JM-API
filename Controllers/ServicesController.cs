@@ -1,5 +1,6 @@
 ﻿using JMAPI.Database;
 using JMAPI.Models;
+using JMAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,10 +18,12 @@ namespace JMAPI.Controllers
     public class ServicesController : ControllerBase
     {
         private readonly AppDbContext _context;
+       
 
         public ServicesController(AppDbContext context)
         {
             _context = context;
+            
         }
 
         // GET: api/Services
@@ -43,6 +46,8 @@ namespace JMAPI.Controllers
 
             return service;
         }
+       
+       
 
         // PUT: api/Services/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754

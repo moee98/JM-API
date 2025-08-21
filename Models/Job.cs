@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace JMAPI.Models
 {
@@ -27,6 +28,8 @@ namespace JMAPI.Models
 
         public  User? CreatedByUser { get; set; } // User who created the job
         public int CreatedByUserId { get; set; }
+        [NotMapped]
+        public IList<Service>? Services { get; set; } = new List<Service>(); // List of services associated with the job
 
     }
 }

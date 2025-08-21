@@ -19,6 +19,9 @@ namespace JMAPI.Services
         public async Task<Vehicle?> GetByIdAsync(int id) =>
             await _context.Vehicles.FindAsync(id);
 
+        public async Task<IList<Vehicle?>> GetByJobIdAsync(int jobId) =>
+           await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Vehicle).Select(js => js.Vehicle).ToListAsync();
+
         public async Task<Vehicle> CreateAsync(Vehicle item)
         {
 

@@ -8,13 +8,16 @@ namespace JMAPI.Services
     public class ServicesService : IServiceTypeService
     {
         private readonly AppDbContext _context;
+        private readonly ServicesService _services;
         public ServicesService(AppDbContext context)
         {
+            
             _context = context;
+            _services = new ServicesService(context);
         }
 
         public async Task<List<Service>> GetAllAsync() =>
-            await _context.Services.ToListAsync();
+            await _services.GetAllAsync();
 
         public async Task<Service?> GetByIdAsync(int id) =>
             await _context.Services.FindAsync(id);

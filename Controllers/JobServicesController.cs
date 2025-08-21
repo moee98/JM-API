@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using JMAPI.Services;
 
 namespace JMAPI.Controllers
 {
@@ -17,10 +18,13 @@ namespace JMAPI.Controllers
     public class JobServicesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly JobServicesService _jobServices;
 
         public JobServicesController(AppDbContext context)
         {
             _context = context;
+            JobServicesService _jobServices = new JobServicesService(context); 
+
         }
 
         // GET: api/JobServices
@@ -42,6 +46,19 @@ namespace JMAPI.Controllers
             }
 
             return jobServices;
+        }
+
+        [HttpGet("/job/{id}")]
+        public async Task<ActionResult<IList<Service>>> GetServicesbyJob(int jobId)
+        {
+           var jobServices = _jobServices.GetByJobIdAsync(jobId);
+
+            if (jobServices == null)
+            {
+                return NotFound();
+            }
+
+            return Ok (jobServices);
         }
 
         // PUT: api/JobServices/5

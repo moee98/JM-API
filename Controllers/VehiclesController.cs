@@ -1,5 +1,6 @@
 ﻿using JMAPI.Database;
 using JMAPI.Models;
+using JMAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,10 +18,14 @@ namespace JMAPI.Controllers
     public class VehiclesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        
+        private readonly VehicleService _vehicleService;
 
         public VehiclesController(AppDbContext context)
         {
             _context = context;
+           
+            _vehicleService = new VehicleService(context);
         }
 
         // GET: api/Vehicles
@@ -42,6 +47,19 @@ namespace JMAPI.Controllers
             }
 
             return vehicle;
+        }
+
+        [HttpGet("/job/{id}")]
+        public async Task<ActionResult<IList<Service>>> GetVehiclebyJob(int jobId)
+        {
+            var jobServices = _vehicleService.GetByJobIdAsync(jobId);
+
+            if (jobServices == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(jobServices);
         }
 
         // PUT: api/Vehicles/5

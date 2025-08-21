@@ -40,20 +40,39 @@ namespace JMAPI.Controllers
         }
 
         // GET api/<JobController>/5
-       
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetId(int id)
         {
-            var jobs = await _jobService.GetByIdAsync(id);
-            if (jobs != null)
+            try
             {
-                return Ok(jobs);
+                var job = await _jobService.GetByIdAsync(id);
+                if (job == null)
+                    return NotFound();
+
+                // Fetch related entities in parallel
+                var vehicleTask = _jobService.GetVehicleAsync(id);
+                var customerTask = _jobService.GetCustomerAsync(id);
+                var userTask = _jobService.GetUserAsync(id);
+                var servicesTask = _jobService.GetServicesAsync(id);
+
+                await Task.WhenAll(vehicleTask, customerTask, userTask, servicesTask);
+
+                // Assign only if results are not null
+                if (vehicleTask.Result != null) job.Vehicle = vehicleTask.Result;
+                if (customerTask.Result != null) job.Customer = customerTask.Result;
+                if (userTask.Result != null) job.CreatedByUser = userTask.Result;
+                if (servicesTask.Result != null) job.Services = servicesTask.Result;
+
+                return Ok(job);
             }
-            else
+            catch (Exception ex)
             {
-                return StatusCode(500);
+                // Log the exception here before returning
+                return StatusCode(500, ex.Message);
             }
         }
+
 
         // POST api/<JobController>
         [HttpPost]
