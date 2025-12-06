@@ -85,9 +85,17 @@ namespace JMAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<Service>> PostService(Service service)
         {
-            _context.Services.Add(service);
-            await _context.SaveChangesAsync();
-
+            var duplicate = await _context.Services
+                .FirstOrDefaultAsync(s => s.Name == service.Name);
+            if (duplicate == null)
+            {
+                _context.Services.Add(service);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                return Conflict("A service with the same name already exists.");
+            }
             return CreatedAtAction("GetService", new { id = service.Id }, service);
         }
 

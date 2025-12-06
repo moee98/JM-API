@@ -4,6 +4,7 @@ using JMAPI.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,13 +12,15 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JMAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251030155456_AddPriceToJobServices")]
+    partial class AddPriceToJobServices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.10")
+                .HasAnnotation("ProductVersion", "9.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -127,7 +130,7 @@ namespace JMAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Customers", (string)null);
+                    b.ToTable("Customers");
                 });
 
             modelBuilder.Entity("JMAPI.Models.ExpenseItem", b =>
@@ -165,7 +168,7 @@ namespace JMAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ExpenseItems", (string)null);
+                    b.ToTable("ExpenseItems");
                 });
 
             modelBuilder.Entity("JMAPI.Models.Job", b =>
@@ -176,16 +179,17 @@ namespace JMAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AppUserId")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("DueDate")
@@ -201,6 +205,14 @@ namespace JMAPI.Migrations
                     b.Property<bool>("Paid")
                         .HasColumnType("bit");
 
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("ServiceCharge")
                         .HasColumnType("int");
 
@@ -214,20 +226,15 @@ namespace JMAPI.Migrations
                     b.Property<int>("VehicleId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("VehicleInspectionId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("AppUserId");
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("VehicleId");
 
-                    b.HasIndex("VehicleInspectionId");
-
-                    b.ToTable("Jobs", (string)null);
+                    b.ToTable("Jobs");
                 });
 
             modelBuilder.Entity("JMAPI.Models.JobServices", b =>
@@ -253,38 +260,7 @@ namespace JMAPI.Migrations
 
                     b.HasIndex("ServiceId");
 
-                    b.ToTable("JobServices", (string)null);
-                });
-
-            modelBuilder.Entity("JMAPI.Models.PaymentMethods", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<int?>("JobId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("MethodName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("JobId");
-
-                    b.ToTable("PaymentMethods", (string)null);
+                    b.ToTable("JobServices");
                 });
 
             modelBuilder.Entity("JMAPI.Models.Service", b =>
@@ -317,7 +293,7 @@ namespace JMAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Services", (string)null);
+                    b.ToTable("Services");
                 });
 
             modelBuilder.Entity("JMAPI.Models.User", b =>
@@ -347,7 +323,7 @@ namespace JMAPI.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("JMAPI.Models.UserRole", b =>
@@ -377,7 +353,7 @@ namespace JMAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("UserRoles", (string)null);
+                    b.ToTable("UserRoles");
                 });
 
             modelBuilder.Entity("JMAPI.Models.Vehicle", b =>
@@ -415,7 +391,7 @@ namespace JMAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Vehicles", (string)null);
+                    b.ToTable("Vehicles");
                 });
 
             modelBuilder.Entity("JMAPI.Models.VehicleInspection", b =>
@@ -441,14 +417,19 @@ namespace JMAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("VehicleId")
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("VehicleId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("UserId");
+
                     b.HasIndex("VehicleId");
 
-                    b.ToTable("VehicleInspection", (string)null);
+                    b.ToTable("VehicleInspection");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -586,9 +567,11 @@ namespace JMAPI.Migrations
 
             modelBuilder.Entity("JMAPI.Models.Job", b =>
                 {
-                    b.HasOne("JMAPI.Models.AppUser", "AppUser")
-                        .WithMany("Jobs")
-                        .HasForeignKey("AppUserId");
+                    b.HasOne("JMAPI.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("JMAPI.Models.Customer", "Customer")
                         .WithMany()
@@ -602,23 +585,17 @@ namespace JMAPI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("JMAPI.Models.VehicleInspection", "VehicleInspection")
-                        .WithMany()
-                        .HasForeignKey("VehicleInspectionId");
-
-                    b.Navigation("AppUser");
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("Customer");
 
                     b.Navigation("Vehicle");
-
-                    b.Navigation("VehicleInspection");
                 });
 
             modelBuilder.Entity("JMAPI.Models.JobServices", b =>
                 {
                     b.HasOne("JMAPI.Models.Job", "Job")
-                        .WithMany("JobServices")
+                        .WithMany()
                         .HasForeignKey("JobId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -634,13 +611,6 @@ namespace JMAPI.Migrations
                     b.Navigation("Service");
                 });
 
-            modelBuilder.Entity("JMAPI.Models.PaymentMethods", b =>
-                {
-                    b.HasOne("JMAPI.Models.Job", null)
-                        .WithMany("PaymentMethod")
-                        .HasForeignKey("JobId");
-                });
-
             modelBuilder.Entity("JMAPI.Models.User", b =>
                 {
                     b.HasOne("JMAPI.Models.UserRole", "Role")
@@ -654,11 +624,17 @@ namespace JMAPI.Migrations
 
             modelBuilder.Entity("JMAPI.Models.VehicleInspection", b =>
                 {
-                    b.HasOne("JMAPI.Models.Vehicle", "Vehicle")
+                    b.HasOne("JMAPI.Models.User", "User")
                         .WithMany()
-                        .HasForeignKey("VehicleId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("JMAPI.Models.Vehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId");
+
+                    b.Navigation("User");
 
                     b.Navigation("Vehicle");
                 });
@@ -712,18 +688,6 @@ namespace JMAPI.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("JMAPI.Models.AppUser", b =>
-                {
-                    b.Navigation("Jobs");
-                });
-
-            modelBuilder.Entity("JMAPI.Models.Job", b =>
-                {
-                    b.Navigation("JobServices");
-
-                    b.Navigation("PaymentMethod");
                 });
 #pragma warning restore 612, 618
         }

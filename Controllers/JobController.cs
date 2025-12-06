@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -53,15 +54,16 @@ namespace JMAPI.Controllers
                 // Fetch related entities in parallel
                 var vehicleTask = _jobService.GetVehicleAsync(id);
                 var customerTask = _jobService.GetCustomerAsync(id);
-                var userTask = _jobService.GetUserAsync(id);
+                //var userTask = _jobService.GetUserAsync(id);
                 var servicesTask = _jobService.GetServicesAsync(id);
-
-                await Task.WhenAll(vehicleTask, customerTask, userTask, servicesTask);
+                job.AppUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)?? "";
+                
+                await Task.WhenAll(vehicleTask, customerTask, servicesTask);
 
                 // Assign only if results are not null
                 if (vehicleTask.Result != null) job.Vehicle = vehicleTask.Result;
                 if (customerTask.Result != null) job.Customer = customerTask.Result;
-                if (userTask.Result != null) job.CreatedByUser = userTask.Result;
+               // if (userTask.Result != null) job.User = userTask.Result;
                 if (servicesTask.Result != null) job.Services = servicesTask.Result;
 
                 return Ok(job);

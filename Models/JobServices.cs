@@ -7,6 +7,7 @@
         public  Job? Job { get; set; } // Navigation property to the Job entity
         public int ServiceId { get; set; } // ID of the service being performed
         public  Service? Service { get; set; } // Navigation property to the Service entity
+        public float Price { get; set; }
     }
 }
  

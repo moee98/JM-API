@@ -3,6 +3,7 @@ using JMAPI.Database;
 using JMAPI.Models;
 using JMAPI.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace JMAPI.Services
 {
@@ -28,8 +29,8 @@ namespace JMAPI.Services
         public async Task<Customer?> GetCustomerAsync(int jobId) =>
            await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Customer).Select(js => js.Customer).FirstOrDefaultAsync();
 
-        public async Task<User?> GetUserAsync(int jobId) =>
-          await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.CreatedByUser).Select(js => js.CreatedByUser).FirstOrDefaultAsync();
+        public async Task<AppUser?> GetUserAsync(int jobId) =>
+          await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.AppUserId).Select(js => js.AppUser).FirstOrDefaultAsync();
         public async Task<IList<Service?>> GetServicesAsync(int jobId) =>
             await _context.JobServices.Where(x => x.JobId == jobId).Include(js => js.Service).Select(js => js.Service).ToListAsync();
         public async Task<Job> CreateAsync(Job item)
@@ -40,11 +41,12 @@ namespace JMAPI.Services
                 item.Customer = customer;
             }
             
-            if(item.CreatedByUserId>0)
-            {
-                var user = await _context.Users.FindAsync(item.CreatedByUserId);
-                item.CreatedByUser = user;
-            }
+
+            //if (item.CreatedByUserId>0)
+            //{
+            //    var user = await _context.Users.FindAsync(item.CreatedByUserId);
+            //    item.CreatedByUser = user;
+            //}
             
             _context.Jobs.Add(item);
             await _context.SaveChangesAsync();
