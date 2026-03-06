@@ -18,10 +18,10 @@ namespace JMAPI.Services
         }
 
         public async Task<List<Job>> GetAllAsync() =>
-            await _context.Jobs.ToListAsync();
+            await _context.Jobs.Include(js => js.Vehicle).ToListAsync();
 
         public async Task<Job?> GetByIdAsync(int id) =>
-            await _context.Jobs.FindAsync(id);
+            await _context.Jobs.Where(x=> x.Id == id).Include(js => js.Vehicle).FirstAsync();
         
         public async Task<Vehicle?> GetVehicleAsync(int jobId) =>
            await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Vehicle).Select(js => js.Vehicle).FirstOrDefaultAsync();
@@ -42,24 +42,111 @@ namespace JMAPI.Services
             }
             
 
-            //if (item.CreatedByUserId>0)
-            //{
-            //    var user = await _context.Users.FindAsync(item.CreatedByUserId);
-            //    item.CreatedByUser = user;
-            //}
             
             _context.Jobs.Add(item);
             await _context.SaveChangesAsync();
             return item;
         }
-
-
-        public async Task<bool> UpdateAsync(Job item)
+        public async Task<Job?> GetByIdWithDetailsAsync(int id)
         {
-            _context.Entry(item).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            return true;
+            return await _context.Jobs
+                .Include(j => j.Vehicle)
+                .Include(j => j.Customer)
+                .Include(j => j.JobServices).ThenInclude(js => js.Service)       // or .Include(j => j.JobServices).ThenInclude(js => js.Service)
+                .FirstOrDefaultAsync(j => j.Id == id);
         }
+
+
+        // Service
+        public async Task<bool> UpdateAsync(int id, Job item)
+        {
+            var existing = await _context.Jobs
+                .Include(j => j.Vehicle)
+                .Include(j => j.JobServices)
+                .FirstOrDefaultAsync(j => j.Id == id);
+
+            if (existing == null) return false;
+
+            // Update root fields
+            existing.Description = item.Description;
+            existing.Status = item.Status;
+            existing.DueDate = item.DueDate;
+            existing.Notes = item.Notes;
+            existing.ServiceCharge = item.ServiceCharge;
+            existing.Paid = item.Paid;
+            existing.PaymentMethod = item.PaymentMethod;
+            existing.AppUserId = item.AppUserId;
+            existing.IsActive = item.IsActive;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            // Update vehicle
+            if (item.Vehicle != null)
+            {
+                if (existing.Vehicle == null)
+                {
+                    existing.Vehicle = new Vehicle
+                    {
+                        LicensePlate = item.Vehicle.LicensePlate,
+                        Make = item.Vehicle.Make,
+                        Model = item.Vehicle.Model,
+                        Colour = item.Vehicle.Colour,
+                        
+                        IsActive = item.Vehicle.IsActive,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                }
+                else
+                {
+                    existing.Vehicle.LicensePlate = item.Vehicle.LicensePlate;
+                    existing.Vehicle.Make = item.Vehicle.Make;
+                    existing.Vehicle.Model = item.Vehicle.Model;
+                    existing.Vehicle.Colour = item.Vehicle.Colour;
+                    
+                    existing.Vehicle.IsActive = item.Vehicle.IsActive;
+                    existing.Vehicle.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            // Sync JobServices
+            var incoming = item.JobServices;
+
+            var incomingIds = incoming.Where(x => x.id > 0).Select(x => x.id).ToHashSet();
+
+            var toRemove = existing.JobServices
+                .Where(db => db.id > 0 && !incomingIds.Contains(db.id))
+                .ToList();
+
+            if (toRemove.Count > 0)
+                _context.JobServices.RemoveRange(toRemove);
+
+            foreach (var inc in incoming)
+            {
+                JobServices? dbRow = null;
+
+                if (inc.id > 0)
+                    dbRow = existing.JobServices.FirstOrDefault(x => x.id == inc.id);
+
+                if (dbRow == null)
+                {
+                    existing.JobServices.Add(new JobServices
+                    {
+                        ServiceId = inc.ServiceId,
+                        Price = inc.Price,
+                        Completed = inc.Completed
+                    });
+                }
+                else
+                {
+                    dbRow.ServiceId = inc.ServiceId;
+                    dbRow.Price = inc.Price;
+                    dbRow.Completed = inc.Completed;
+                }
+            }
+
+            var affected = await _context.SaveChangesAsync();
+            return affected > 0;
+        } 
 
         public async Task<bool> DeleteAsync(int id)
         {

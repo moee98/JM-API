@@ -4,6 +4,7 @@ using JMAPI.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JMAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260221155408_AddExpenseCategory")]
+    partial class AddExpenseCategory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -156,23 +159,6 @@ namespace JMAPI.Migrations
                     b.ToTable("Customers");
                 });
 
-            modelBuilder.Entity("JMAPI.Models.ExpenseCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ExpenseCategory");
-                });
-
             modelBuilder.Entity("JMAPI.Models.ExpenseItem", b =>
                 {
                     b.Property<int>("Id")
@@ -184,15 +170,16 @@ namespace JMAPI.Migrations
                     b.Property<float>("Amount")
                         .HasColumnType("real");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("DateIncurred")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("ExpenseCategoryId")
-                        .HasColumnType("int");
 
                     b.Property<bool>("IsReimbursed")
                         .HasColumnType("bit");
@@ -202,11 +189,13 @@ namespace JMAPI.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ReceiptImagePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReciptImagePath")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ExpenseCategoryId");
 
                     b.ToTable("ExpenseItems");
                 });
@@ -631,17 +620,6 @@ namespace JMAPI.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
-                });
-
-            modelBuilder.Entity("JMAPI.Models.ExpenseItem", b =>
-                {
-                    b.HasOne("JMAPI.Models.ExpenseCategory", "ExpenseCategory")
-                        .WithMany()
-                        .HasForeignKey("ExpenseCategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ExpenseCategory");
                 });
 
             modelBuilder.Entity("JMAPI.Models.JobServices", b =>

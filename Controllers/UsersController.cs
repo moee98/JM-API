@@ -23,6 +23,7 @@ namespace JMAPI.Controllers
 
         public UsersController(UserManager<AppUser> userManager)
         {
+
             _userManager = userManager;
         }
 
@@ -53,6 +54,53 @@ namespace JMAPI.Controllers
                 
             });
         
+        }
+        [HttpGet("name/{Id}")]
+        public async Task<IActionResult> GetCurrentUser(string Id)
+        {
+            if (string.IsNullOrEmpty(Id))
+                return Unauthorized(Id);
+
+            // Find the user using Identity
+            var user = await _userManager.FindByIdAsync(Id);
+
+            if (user == null)
+                return NotFound();
+
+            // Return only safe fields
+            return Ok(
+                
+              
+                user.Name
+
+
+            );
+
+        }
+
+        [HttpGet("users/{Id}")]
+        public async Task<IActionResult> GetUser(string Id)
+        {
+
+
+            if (string.IsNullOrEmpty(Id))
+                return Unauthorized(Id);
+
+            // Find the user using Identity
+            var user = await _userManager.FindByIdAsync(Id);
+
+            if (user == null)
+                return NotFound();
+
+            // Return only safe fields
+            return Ok(
+
+
+                user.Name
+
+
+            );
+
         }
 
         // GET: api/Users/5

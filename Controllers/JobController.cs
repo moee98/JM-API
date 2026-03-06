@@ -8,8 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-
 namespace JMAPI.Controllers
 {
     [Authorize]
@@ -41,40 +39,24 @@ namespace JMAPI.Controllers
         }
 
         // GET api/<JobController>/5
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetId(int id)
         {
             try
             {
-                var job = await _jobService.GetByIdAsync(id);
+                var job = await _jobService.GetByIdWithDetailsAsync(id);
                 if (job == null)
                     return NotFound();
 
-                // Fetch related entities in parallel
-                var vehicleTask = _jobService.GetVehicleAsync(id);
-                var customerTask = _jobService.GetCustomerAsync(id);
-                //var userTask = _jobService.GetUserAsync(id);
-                var servicesTask = _jobService.GetServicesAsync(id);
-                job.AppUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)?? "";
-                
-                await Task.WhenAll(vehicleTask, customerTask, servicesTask);
-
-                // Assign only if results are not null
-                if (vehicleTask.Result != null) job.Vehicle = vehicleTask.Result;
-                if (customerTask.Result != null) job.Customer = customerTask.Result;
-               // if (userTask.Result != null) job.User = userTask.Result;
-                if (servicesTask.Result != null) job.Services = servicesTask.Result;
+                job.AppUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
 
                 return Ok(job);
             }
             catch (Exception ex)
             {
-                // Log the exception here before returning
                 return StatusCode(500, ex.Message);
             }
         }
-
 
         // POST api/<JobController>
         [HttpPost]
@@ -92,30 +74,57 @@ namespace JMAPI.Controllers
             {
                 try
                 {
-                   
                     var created = await _jobService.CreateAsync(job);
-                    //return CreatedAtAction(await _jobService(GetJobById(), new { id = created.Id }, created);
-                    // return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+                    if(created == null)
+                    {
+                        return StatusCode(500, "Failed to create job.");
+                    }
+                    
                     return StatusCode(200, created);
                 }
                 catch(Exception ex)
                 {
                     return StatusCode(500,ex.Message + ex.InnerException);
                 }
-
             }                
         }
 
         // PUT api/<JobController>/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> UpdateJob(int id, [FromBody] Job request)
         {
+            if (request == null) return BadRequest("Request body is required.");
+
+            var updated = await _jobService.UpdateAsync(id, request);
+            if (!updated) return NotFound($"Job {id} not found.");
+
+            return NoContent();
         }
 
         // DELETE api/<JobController>/5
         [HttpDelete("{id}")]
-        public void Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            if (id == 0)
+            {
+                return BadRequest("Id cannot be zero.");
+            }
+
+            var deleted = await _jobService.DeleteAsync(id);
+
+            if (deleted)
+            {
+                return Ok("Job deleted successfully.");
+            }
+            else
+            {
+                return StatusCode(500, "Failed to delete job.");
+            }
         }
     }
 }

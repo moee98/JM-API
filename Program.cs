@@ -1,12 +1,13 @@
-﻿using JMAPI.Models;
-using JMAPI.Database;
+﻿using JMAPI.Database;
 using JMAPI.Interfaces;
+using JMAPI.Models;
 using JMAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
@@ -15,7 +16,11 @@ var config = builder.Configuration;
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+     .AddJsonOptions(options =>
+     {
+         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+     }); ;
 
 builder.Services.AddOpenApi();
 
@@ -23,7 +28,8 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") //React dev server
+        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173",
+                "http://192.168.1.107:5173") //React dev server
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // for cookies or auth headers
@@ -70,6 +76,9 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<TokenService>();
+
+// Register the expense items service used by ExpenseItemsController
+builder.Services.AddScoped<IExpenseItemsService, ExpenseItemsService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

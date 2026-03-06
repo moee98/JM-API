@@ -1,13 +1,11 @@
 ﻿using JMAPI.Database;
+using JMAPI.Interfaces;
 using JMAPI.Models;
+using JMAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace JMAPI.Controllers
 {
@@ -16,72 +14,71 @@ namespace JMAPI.Controllers
     [ApiController]
     public class ExpenseItemsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        
+        private readonly IExpenseItemsService _expenseItem;
 
-        public ExpenseItemsController(AppDbContext context)
+        public ExpenseItemsController(IExpenseItemsService expenseItemService)
         {
-            _context = context;
+            _expenseItem = expenseItemService;
         }
 
         // GET: api/ExpenseItems
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ExpenseItem>>> GetExpenseItems()
+        public async Task<IActionResult> GetExpenseItems()
         {
-            return await _context.ExpenseItems.ToListAsync();
+            return Ok(await _expenseItem.GetAllAsync());
         }
 
         // GET: api/ExpenseItems/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<ExpenseItem>> GetExpenseItem(int id)
+        public async Task<IActionResult> GetExpenseItem(int id)
         {
-            var expenseItem = await _context.ExpenseItems.FindAsync(id);
+            var expenseItem = await _expenseItem.GetByIdAsync(id);
 
             if (expenseItem == null)
             {
                 return NotFound();
             }
 
-            return expenseItem;
+            return Ok(expenseItem);
+        }
+
+        // GET: api/ExpenseItems/category/
+        [HttpGet("category")]
+        public async Task<IActionResult> GetExpenseCategories()
+        {
+            var items = await _expenseItem.GetExpenseCategories();
+            if (items == null || !items.Any())
+            {
+                return NotFound($"No category found.");
+            }
+            return Ok(items);
         }
 
         // PUT: api/ExpenseItems/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutExpenseItem(int id, ExpenseItem expenseItem)
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> UpdateExpenseItem(int id, [FromBody] ExpenseItem request)
         {
-            if (id != expenseItem.Id)
-            {
-                return BadRequest();
-            }
+            if (request == null) return BadRequest("Request body is required.");
 
-            _context.Entry(expenseItem).State = EntityState.Modified;
+            var updated = await _expenseItem.UpdateAsync( request);
+            if (!updated) return NotFound($"Expense Item {id} not found.");
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ExpenseItemExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            return Ok(updated);
         }
 
         // POST: api/ExpenseItems
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<ExpenseItem>> PostExpenseItem(ExpenseItem expenseItem)
+        public async Task<IActionResult> PostExpenseItem(ExpenseItem expenseItem)
         {
-            _context.ExpenseItems.Add(expenseItem);
-            await _context.SaveChangesAsync();
+            var res = _expenseItem.CreateAsync(expenseItem);
+
+            if (res != null) {
+                return Ok(res);
+            }
 
             return CreatedAtAction("GetExpenseItem", new { id = expenseItem.Id }, expenseItem);
         }
@@ -90,21 +87,18 @@ namespace JMAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteExpenseItem(int id)
         {
-            var expenseItem = await _context.ExpenseItems.FindAsync(id);
-            if (expenseItem == null)
+            var res = await _expenseItem.DeleteAsync(id);
+            if (!res )
             {
                 return NotFound();
             }
 
-            _context.ExpenseItems.Remove(expenseItem);
-            await _context.SaveChangesAsync();
+            if(res == false)
+            {
+                return StatusCode(500, "Failed to delete expense item.");
+            }
 
-            return NoContent();
-        }
-
-        private bool ExpenseItemExists(int id)
-        {
-            return _context.ExpenseItems.Any(e => e.Id == id);
+            return Ok();
         }
     }
 }

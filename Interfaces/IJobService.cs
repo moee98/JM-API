@@ -11,7 +11,8 @@ namespace JMAPI.Interfaces
         Task<IList<Service?>> GetServicesAsync(int jobId);
        // Task<User?> GetUserAsync(int jobId);
         Task<Job> CreateAsync(Job job); 
-        Task<bool> UpdateAsync(Job job); 
-        Task<bool> DeleteAsync(int id); 
+        Task<bool> UpdateAsync(int id, Job job); 
+        Task<bool> DeleteAsync(int id);
+        Task<Job?> GetByIdWithDetailsAsync(int id);
     }
 }
