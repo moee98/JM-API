@@ -4,7 +4,8 @@ namespace JMAPI.Interfaces
     public interface IVehicleService
     {
         Task<List<Vehicle>> GetAllAsync();
-        Task<Vehicle> GetByIdAsync(int id);
+        Task<Vehicle?> GetByIdAsync(int id);
+        Task<Vehicle?> GetByJobIdAsync(int jobId);
         Task<Vehicle> CreateAsync(Vehicle item);
         Task<bool> UpdateAsync(Vehicle item);
         Task<bool> DeleteAsync(int id);

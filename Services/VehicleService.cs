@@ -19,13 +19,14 @@ namespace JMAPI.Services
         public async Task<Vehicle?> GetByIdAsync(int id) =>
             await _context.Vehicles.FindAsync(id);
 
-        public async Task<IList<Vehicle?>> GetByJobIdAsync(int jobId) =>
-           await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Vehicle).Select(js => js.Vehicle).ToListAsync();
+        public async Task<Vehicle?> GetByJobIdAsync(int jobId) =>
+            await _context.Jobs
+                .Where(x => x.Id == jobId)
+                .Select(js => js.Vehicle)
+                .FirstOrDefaultAsync();
 
         public async Task<Vehicle> CreateAsync(Vehicle item)
         {
-
-
             _context.Vehicles.Add(item);
             await _context.SaveChangesAsync();
             return item;

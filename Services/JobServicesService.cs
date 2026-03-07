@@ -17,11 +17,13 @@ namespace JMAPI.Services
         public async Task<List<JobServices>> GetAllAsync() =>
             await _context.JobServices.ToListAsync();
 
-        public async Task<IList<Service?>> GetByJobIdAsync(int jobId) =>
-            await _context.JobServices.Where(x => x.JobId == jobId).Include(js => js.Service).Select(js => js.Service).ToListAsync();
-            
-        
-           
+        public async Task<IList<Service>> GetByJobIdAsync(int jobId) =>
+            await _context.JobServices
+                .Where(x => x.JobId == jobId && x.Service != null)
+                .Include(js => js.Service)
+                .Select(js => js.Service!)
+                .ToListAsync();
+
 
         public async Task<JobServices> CreateAsync(JobServices item)
         {

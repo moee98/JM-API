@@ -1,4 +1,5 @@
 ﻿using JMAPI.Database;
+using JMAPI.Interfaces;
 using JMAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -8,8 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using JMAPI.Services;
-
 namespace JMAPI.Controllers
 {
     [Authorize]
@@ -18,13 +17,12 @@ namespace JMAPI.Controllers
     public class JobServicesController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly JobServicesService _jobServices;
+        private readonly IJobServicesService _jobServices;
 
-        public JobServicesController(AppDbContext context)
+        public JobServicesController(AppDbContext context, IJobServicesService jobServices)
         {
             _context = context;
-            JobServicesService _jobServices = new JobServicesService(context); 
-
+            _jobServices = jobServices;
         }
 
         // GET: api/JobServices
@@ -48,17 +46,11 @@ namespace JMAPI.Controllers
             return jobServices;
         }
 
-        [HttpGet("/job/{id}")]
-        public async Task<ActionResult<IList<Service>>> GetServicesbyJob(int jobId)
+        [HttpGet("job/{jobId:int}")]
+        public async Task<ActionResult<IList<Service>>> GetServicesByJob(int jobId)
         {
-           var jobServices = _jobServices.GetByJobIdAsync(jobId);
-
-            if (jobServices == null)
-            {
-                return NotFound();
-            }
-
-            return Ok (jobServices);
+            var jobServices = await _jobServices.GetByJobIdAsync(jobId);
+            return Ok(jobServices);
         }
 
         // PUT: api/JobServices/5

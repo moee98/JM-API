@@ -62,11 +62,12 @@ namespace JMAPI.Controllers
         public async Task<IActionResult> UpdateExpenseItem(int id, [FromBody] ExpenseItem request)
         {
             if (request == null) return BadRequest("Request body is required.");
+            if (id != request.Id) return BadRequest("Route id does not match payload id.");
 
-            var updated = await _expenseItem.UpdateAsync( request);
+            var updated = await _expenseItem.UpdateAsync(request);
             if (!updated) return NotFound($"Expense Item {id} not found.");
 
-            return Ok(updated);
+            return NoContent();
         }
 
         // POST: api/ExpenseItems
@@ -74,13 +75,8 @@ namespace JMAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> PostExpenseItem(ExpenseItem expenseItem)
         {
-            var res = _expenseItem.CreateAsync(expenseItem);
-
-            if (res != null) {
-                return Ok(res);
-            }
-
-            return CreatedAtAction("GetExpenseItem", new { id = expenseItem.Id }, expenseItem);
+            var created = await _expenseItem.CreateAsync(expenseItem);
+            return CreatedAtAction(nameof(GetExpenseItem), new { id = created.Id }, created);
         }
 
         // DELETE: api/ExpenseItems/5
@@ -88,17 +84,12 @@ namespace JMAPI.Controllers
         public async Task<IActionResult> DeleteExpenseItem(int id)
         {
             var res = await _expenseItem.DeleteAsync(id);
-            if (!res )
+            if (!res)
             {
                 return NotFound();
             }
 
-            if(res == false)
-            {
-                return StatusCode(500, "Failed to delete expense item.");
-            }
-
-            return Ok();
+            return NoContent();
         }
     }
 }

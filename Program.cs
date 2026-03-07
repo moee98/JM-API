@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using Swashbuckle.AspNetCore.SwaggerUI;
+using Swashbuckle.AspNetCore.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
@@ -75,6 +78,8 @@ builder.Services.AddAuthentication(options =>
 
 
 builder.Services.AddScoped<IJobService, JobService>();
+builder.Services.AddScoped<IJobServicesService, JobServicesService>();
+builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<TokenService>();
 
 // Register the expense items service used by ExpenseItemsController

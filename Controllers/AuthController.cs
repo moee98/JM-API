@@ -1,12 +1,8 @@
-﻿using JMAPI.Models;
+using JMAPI.Models;
 using JMAPI.Services;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 namespace JMAPI.Controllers
 {
@@ -15,39 +11,55 @@ namespace JMAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<AppUser> _userManager;
-        private readonly SignInManager<AppUser> _signInManager;
-        private readonly IConfiguration _config;
+        private readonly RoleManager<IdentityRole> _roleManager;
         private readonly TokenService _tokenService;
 
-        public AuthController(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, IConfiguration config, TokenService tokenService)
+        public AuthController(
+            UserManager<AppUser> userManager,
+            RoleManager<IdentityRole> roleManager,
+            TokenService tokenService)
         {
             _userManager = userManager;
-            _signInManager = signInManager;
-            _config = config;
+            _roleManager = roleManager;
             _tokenService = tokenService;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] AuthModel model)
         {
-            try
+            var user = new AppUser
             {
-                var user = new AppUser { UserName = model.Email, Email = model.Email, PhoneNumber = model.PhoneNumber, Name = model.Name };
-                var result = await _userManager.CreateAsync(user, model.Password);
+                UserName = model.Email,
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                Name = model.Name
+            };
 
-                if (result.Succeeded)
+            var createResult = await _userManager.CreateAsync(user, model.Password);
+            if (!createResult.Succeeded)
+            {
+                return BadRequest(createResult.Errors);
+            }
+
+            const string defaultRole = "User";
+            if (!await _roleManager.RoleExistsAsync(defaultRole))
+            {
+                var roleResult = await _roleManager.CreateAsync(new IdentityRole(defaultRole));
+                if (!roleResult.Succeeded)
                 {
-                    var addRole = await _userManager.AddToRoleAsync(user, "User");
-                    return Ok();
+                    await _userManager.DeleteAsync(user);
+                    return StatusCode(500, roleResult.Errors);
                 }
-
-                return BadRequest(result.Errors);
             }
-            catch (Exception ex)
+
+            var addRoleResult = await _userManager.AddToRoleAsync(user, defaultRole);
+            if (!addRoleResult.Succeeded)
             {
-                return BadRequest(ex.Message + ex.InnerException);
+                await _userManager.DeleteAsync(user);
+                return BadRequest(addRoleResult.Errors);
             }
 
+            return Ok(CreateUserResponse(user));
         }
 
         [HttpPost("login")]
@@ -55,75 +67,75 @@ namespace JMAPI.Controllers
         {
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
-                return Unauthorized();
-
-            var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Email, user.Email)
-            };
+                return Unauthorized();
+            }
+
+            var claims = await BuildClaimsAsync(user);
 
             var accessToken = _tokenService.GenerateAccessToken(claims);
             var refreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // adjust as needed
-            await _userManager.UpdateAsync(user);
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return StatusCode(500, updateResult.Errors);
+            }
 
             return Ok(new
             {
                 token = accessToken,
                 refreshToken,
-                user
+                user = CreateUserResponse(user)
             });
         }
-
-        private string GenerateJwtToken(AppUser user)
-        {
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Email, user.Email),
-
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Key"]!));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _config["JwtSettings:Issuer"],
-                audience: _config["JwtSettings:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: creds
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
 
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] Token tokenModel)
         {
             if (tokenModel is null)
+            {
                 return BadRequest("Invalid client request");
+            }
 
-            var principal = _tokenService.GetPrincipalFromExpiredToken(tokenModel.AccessToken);
+            ClaimsPrincipal principal;
+            try
+            {
+                principal = _tokenService.GetPrincipalFromExpiredToken(tokenModel.AccessToken);
+            }
+            catch
+            {
+                return Unauthorized();
+            }
+
             var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null ||
                 user.RefreshToken != tokenModel.RefreshToken ||
+                user.RefreshTokenExpiryTime == null ||
                 user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
                 return Unauthorized();
             }
 
-            var newAccessToken = _tokenService.GenerateAccessToken(principal.Claims);
+            var claims = await BuildClaimsAsync(user);
+            var newAccessToken = _tokenService.GenerateAccessToken(claims);
             var newRefreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
-            await _userManager.UpdateAsync(user);
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return StatusCode(500, updateResult.Errors);
+            }
 
             return Ok(new
             {
@@ -132,6 +144,31 @@ namespace JMAPI.Controllers
             });
         }
 
+        private async Task<List<Claim>> BuildClaimsAsync(AppUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
+            };
 
+            if (!string.IsNullOrWhiteSpace(user.Name))
+            {
+                claims.Add(new Claim(ClaimTypes.Name, user.Name));
+            }
+
+            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+            return claims;
+        }
+
+        private static object CreateUserResponse(AppUser user) => new
+        {
+            user.Id,
+            user.UserName,
+            user.Email,
+            user.Name,
+            user.PhoneNumber
+        };
     }
 }

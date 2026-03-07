@@ -21,7 +21,7 @@ namespace JMAPI.Services
             await _context.Jobs.Include(js => js.Vehicle).ToListAsync();
 
         public async Task<Job?> GetByIdAsync(int id) =>
-            await _context.Jobs.Where(x=> x.Id == id).Include(js => js.Vehicle).FirstAsync();
+            await _context.Jobs.Where(x=> x.Id == id).Include(js => js.Vehicle).FirstOrDefaultAsync();
         
         public async Task<Vehicle?> GetVehicleAsync(int jobId) =>
            await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Vehicle).Select(js => js.Vehicle).FirstOrDefaultAsync();
@@ -30,7 +30,7 @@ namespace JMAPI.Services
            await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.Customer).Select(js => js.Customer).FirstOrDefaultAsync();
 
         public async Task<AppUser?> GetUserAsync(int jobId) =>
-          await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.AppUserId).Select(js => js.AppUser).FirstOrDefaultAsync();
+          await _context.Jobs.Where(x => x.Id == jobId).Include(js => js.AppUser).Select(js => js.AppUser).FirstOrDefaultAsync();
         public async Task<IList<Service?>> GetServicesAsync(int jobId) =>
             await _context.JobServices.Where(x => x.JobId == jobId).Include(js => js.Service).Select(js => js.Service).ToListAsync();
         public async Task<Job> CreateAsync(Job item)

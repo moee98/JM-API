@@ -20,7 +20,9 @@ namespace JMAPI.Services
             await _context.ExpenseItems.ToListAsync();
 
         public async Task<ExpenseItem?> GetByIdAsync(int id) =>
-            await _context.ExpenseItems.Where(x=> x.Id == id).Include(x=> x.ExpenseCategoryId).FirstAsync();
+            await _context.ExpenseItems
+                .Include(x => x.ExpenseCategory)
+                .FirstOrDefaultAsync(x => x.Id == id);
 
         public async Task<ExpenseItem> CreateAsync(ExpenseItem item)
         {
@@ -31,6 +33,9 @@ namespace JMAPI.Services
 
         public async Task<bool> UpdateAsync(ExpenseItem item)
         {
+            var exists = await _context.ExpenseItems.AnyAsync(x => x.Id == item.Id);
+            if (!exists) return false;
+
             _context.Entry(item).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return true;
