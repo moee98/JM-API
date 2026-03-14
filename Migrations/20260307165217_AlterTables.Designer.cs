@@ -4,6 +4,7 @@ using JMAPI.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JMAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260307165217_AlterTables")]
+    partial class AlterTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -211,42 +214,6 @@ namespace JMAPI.Migrations
                     b.ToTable("ExpenseItems");
                 });
 
-            modelBuilder.Entity("JMAPI.Models.ExpenseItemAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<byte[]>("Data")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)");
-
-                    b.Property<int>("ExpenseItemId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpenseItemId");
-
-                    b.ToTable("ExpenseItemAttachments");
-                });
-
             modelBuilder.Entity("JMAPI.Models.JobServices", b =>
                 {
                     b.Property<int>("id")
@@ -412,42 +379,6 @@ namespace JMAPI.Migrations
                     b.HasIndex("VehicleId");
 
                     b.ToTable("VehicleInspection");
-                });
-
-            modelBuilder.Entity("JMAPI.Models.VehicleInspectionAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<byte[]>("Data")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("VehicleInspectionId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VehicleInspectionId");
-
-                    b.ToTable("VehicleInspectionAttachments");
                 });
 
             modelBuilder.Entity("Job", b =>
@@ -656,17 +587,6 @@ namespace JMAPI.Migrations
                     b.Navigation("ExpenseCategory");
                 });
 
-            modelBuilder.Entity("JMAPI.Models.ExpenseItemAttachment", b =>
-                {
-                    b.HasOne("JMAPI.Models.ExpenseItem", "ExpenseItem")
-                        .WithMany("Attachments")
-                        .HasForeignKey("ExpenseItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ExpenseItem");
-                });
-
             modelBuilder.Entity("JMAPI.Models.JobServices", b =>
                 {
                     b.HasOne("Job", "Job")
@@ -704,17 +624,6 @@ namespace JMAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("Vehicle");
-                });
-
-            modelBuilder.Entity("JMAPI.Models.VehicleInspectionAttachment", b =>
-                {
-                    b.HasOne("JMAPI.Models.VehicleInspection", "VehicleInspection")
-                        .WithMany("Attachments")
-                        .HasForeignKey("VehicleInspectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("VehicleInspection");
                 });
 
             modelBuilder.Entity("Job", b =>
@@ -802,16 +711,6 @@ namespace JMAPI.Migrations
             modelBuilder.Entity("JMAPI.Models.AppUser", b =>
                 {
                     b.Navigation("Jobs");
-                });
-
-            modelBuilder.Entity("JMAPI.Models.ExpenseItem", b =>
-                {
-                    b.Navigation("Attachments");
-                });
-
-            modelBuilder.Entity("JMAPI.Models.VehicleInspection", b =>
-                {
-                    b.Navigation("Attachments");
                 });
 
             modelBuilder.Entity("Job", b =>

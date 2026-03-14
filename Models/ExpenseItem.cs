@@ -1,5 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace JMAPI.Models
 {
@@ -10,9 +11,11 @@ namespace JMAPI.Models
         public float Amount { get; set; }
         public DateTime DateIncurred { get; set; }
         public int ExpenseCategoryId { get; set; }
-        public ExpenseCategory? ExpenseCategory { get; set; } // Navigation property to the category   
-        public string? ReceiptImagePath { get; set; } // Path to the receipt image file
-        public required bool IsReimbursed { get; set; } // Indicates if the expense has been reimbursed
-        public required string PaymentMethod { get; set; } // Method of payment (e.g., "Cash", "Credit Card", etc.)
+        public ExpenseCategory? ExpenseCategory { get; set; }
+        public string? ReceiptImagePath { get; set; }
+        public required bool IsReimbursed { get; set; }
+        public required string PaymentMethod { get; set; }
+        [JsonIgnore]
+        public IList<ExpenseItemAttachment> Attachments { get; set; } = [];
     }
 }

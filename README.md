@@ -130,6 +130,31 @@ Current controller groups include:
 
 Most business controllers require authentication.
 
+### Attachment Uploads
+
+Expense items and vehicle inspections now support storing image and PDF attachments directly in the database.
+
+Supported files:
+
+- images such as `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`
+- `.pdf`
+
+Expense item attachment flow:
+
+1. create the expense item with `POST /api/ExpenseItems`
+2. upload one or more files with `POST /api/ExpenseItems/{id}/attachments` using `multipart/form-data`
+3. view attachment metadata from `GET /api/ExpenseItems/{id}`
+4. download a file from `GET /api/ExpenseItems/{id}/attachments/{attachmentId}`
+
+Vehicle inspection attachment flow:
+
+1. create the inspection with `POST /api/VehicleInspections`
+2. upload one or more files with `POST /api/VehicleInspections/{id}/attachments` using `multipart/form-data`
+3. view attachment metadata from `GET /api/VehicleInspections/{id}`
+4. download a file from `GET /api/VehicleInspections/{id}/attachments/{attachmentId}`
+
+For the upload routes, use the form field name `Files`.
+
 ## Testing
 
 The repository includes an integration test project at `JMAPI.Tests`.

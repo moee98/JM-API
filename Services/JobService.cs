@@ -77,6 +77,7 @@ namespace JMAPI.Services
             existing.PaymentMethod = item.PaymentMethod;
             existing.AppUserId = item.AppUserId;
             existing.IsActive = item.IsActive;
+            existing.VehicleInspectionId = item.VehicleInspectionId;
             existing.UpdatedAt = DateTime.UtcNow;
 
             // Update vehicle

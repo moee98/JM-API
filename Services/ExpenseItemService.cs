@@ -17,10 +17,13 @@ namespace JMAPI.Services
         }
 
         public async Task<List<ExpenseItem>> GetAllAsync() =>
-            await _context.ExpenseItems.ToListAsync();
+            await _context.ExpenseItems
+                .Include(x => x.Attachments)
+                .ToListAsync();
 
         public async Task<ExpenseItem?> GetByIdAsync(int id) =>
             await _context.ExpenseItems
+                .Include(x => x.Attachments)
                 .Include(x => x.ExpenseCategory)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -33,10 +36,17 @@ namespace JMAPI.Services
 
         public async Task<bool> UpdateAsync(ExpenseItem item)
         {
-            var exists = await _context.ExpenseItems.AnyAsync(x => x.Id == item.Id);
-            if (!exists) return false;
+            var existing = await _context.ExpenseItems.FindAsync(item.Id);
+            if (existing == null) return false;
 
-            _context.Entry(item).State = EntityState.Modified;
+            existing.Description = item.Description;
+            existing.Amount = item.Amount;
+            existing.DateIncurred = item.DateIncurred;
+            existing.ExpenseCategoryId = item.ExpenseCategoryId;
+            existing.ReceiptImagePath = item.ReceiptImagePath;
+            existing.IsReimbursed = item.IsReimbursed;
+            existing.PaymentMethod = item.PaymentMethod;
+
             await _context.SaveChangesAsync();
             return true;
         }
