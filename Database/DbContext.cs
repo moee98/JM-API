@@ -25,7 +25,8 @@ namespace JMAPI.Database
         //public DbSet<PaymentMethods> PaymentMethods { get; set; } // Assuming PaymentMethods is a class that represents payment methods
         //public DbSet<AppUser> AppUsers { get; set; } // Assuming AppUser is a class that represents application users
         //public DbSet<ExpenseItem> Expenses { get; set; } // Assuming Expense is a class that represents expenses
-        public DbSet<CompanyDetails> CompanyDetails { get; set; } // Assuming CompanyDetails is a class that represents company details
-        
+        public DbSet<CompanyDetails> CompanyDetails { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<IntegrationToken> IntegrationTokens { get; set; }
     }
 }

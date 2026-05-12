@@ -17,8 +17,55 @@ namespace JMAPI.Services
             _context = context;
         }
 
-        public async Task<List<Job>> GetAllAsync() =>
-            await _context.Jobs.Include(js => js.Vehicle).ToListAsync();
+        public async Task<PaginatedResult<Job>> GetAllAsync(int page = 1, int pageSize = 20, string? search = null, string? status = null, bool? paid = null)
+        {
+            var query = _context.Jobs
+                .Include(j => j.Vehicle)
+                .Include(j => j.Customer)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(j =>
+                    (j.Customer != null && j.Customer.Name.ToLower().Contains(term)) ||
+                    (j.Vehicle != null && j.Vehicle.LicensePlate.ToLower().Contains(term)) ||
+                    (j.Notes != null && j.Notes.ToLower().Contains(term)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(j => j.Status == status);
+
+            if (paid.HasValue)
+                query = query.Where(j => j.Paid == paid.Value);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(j => j.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PaginatedResult<Job>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
+
+        public async Task<List<Job>> GetOutstandingAsync()
+        {
+            return await _context.Jobs
+                .Include(j => j.Vehicle)
+                .Include(j => j.Customer)
+                .Include(j => j.JobServices).ThenInclude(js => js.Service)
+                .Where(j => !j.Paid)
+                .OrderBy(j => j.DueDate)
+                .ToListAsync();
+        }
 
         public async Task<Job?> GetByIdAsync(int id) =>
             await _context.Jobs.Where(x=> x.Id == id).Include(js => js.Vehicle).FirstOrDefaultAsync();

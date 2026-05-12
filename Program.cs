@@ -31,8 +31,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173",
-                "http://192.168.1.107:5173") //React dev server
+        policy.WithOrigins(
+                "http://localhost:5173", "http://127.0.0.1:5173",
+                "http://192.168.1.107:5173",
+                "http://localhost",                          // Docker
+                "http://kazadashboard", "https://kazadashboard")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // for cookies or auth headers
@@ -84,6 +87,10 @@ builder.Services.AddScoped<TokenService>();
 
 // Register the expense items service used by ExpenseItemsController
 builder.Services.AddScoped<IExpenseItemsService, ExpenseItemsService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IIntegrationService, IntegrationService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

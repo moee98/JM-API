@@ -1,5 +1,6 @@
 using JMAPI.Models;
 using JMAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -13,15 +14,51 @@ namespace JMAPI.Controllers
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly TokenService _tokenService;
+        private readonly IHostEnvironment _env;
+        private readonly IConfiguration _config;
 
         public AuthController(
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
-            TokenService tokenService)
+            TokenService tokenService,
+            IHostEnvironment env,
+            IConfiguration config)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _tokenService = tokenService;
+            _env = env;
+            _config = config;
+        }
+
+        // Whether the JWT cookie requires HTTPS. Defaults to true in production
+        // and false in development. Override via "Cookies:Secure" in appsettings.
+        private bool CookieSecure =>
+            _config.GetValue<bool?>("Cookies:Secure") ?? !_env.IsDevelopment();
+
+        // Sets the JWT access token as an HTTP-only cookie so it cannot be
+        // read or stolen by JavaScript (XSS protection).
+        private void SetJwtCookie(string accessToken)
+        {
+            Response.Cookies.Append("jwt", accessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = CookieSecure,
+                SameSite = SameSiteMode.Strict,
+                MaxAge = TimeSpan.FromMinutes(15),
+                Path = "/"
+            });
+        }
+
+        private void ClearJwtCookie()
+        {
+            Response.Cookies.Delete("jwt", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = CookieSecure,
+                SameSite = SameSiteMode.Strict,
+                Path = "/"
+            });
         }
 
         [HttpPost("register")]
@@ -85,26 +122,35 @@ namespace JMAPI.Controllers
                 return StatusCode(500, updateResult.Errors);
             }
 
+            // Set access token as HTTP-only cookie — never exposed to JavaScript
+            SetJwtCookie(accessToken);
+
             return Ok(new
             {
-                token = accessToken,
                 refreshToken,
                 user = CreateUserResponse(user)
             });
         }
 
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh([FromBody] Token tokenModel)
+        public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
         {
-            if (tokenModel is null)
+            if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
             {
-                return BadRequest("Invalid client request");
+                return BadRequest("Refresh token is required.");
+            }
+
+            // Read the expired access token from the HTTP-only cookie
+            var expiredAccessToken = Request.Cookies["jwt"];
+            if (string.IsNullOrWhiteSpace(expiredAccessToken))
+            {
+                return Unauthorized();
             }
 
             ClaimsPrincipal principal;
             try
             {
-                principal = _tokenService.GetPrincipalFromExpiredToken(tokenModel.AccessToken);
+                principal = _tokenService.GetPrincipalFromExpiredToken(expiredAccessToken);
             }
             catch
             {
@@ -119,15 +165,15 @@ namespace JMAPI.Controllers
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null ||
-                user.RefreshToken != tokenModel.RefreshToken ||
+                user.RefreshToken != request.RefreshToken ||
                 user.RefreshTokenExpiryTime == null ||
                 user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
                 return Unauthorized();
             }
 
-            var claims = await BuildClaimsAsync(user);
-            var newAccessToken = _tokenService.GenerateAccessToken(claims);
+            var newClaims = await BuildClaimsAsync(user);
+            var newAccessToken = _tokenService.GenerateAccessToken(newClaims);
             var newRefreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
@@ -137,11 +183,31 @@ namespace JMAPI.Controllers
                 return StatusCode(500, updateResult.Errors);
             }
 
-            return Ok(new
+            // Rotate the access token cookie
+            SetJwtCookie(newAccessToken);
+
+            return Ok(new { refreshToken = newRefreshToken });
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!string.IsNullOrEmpty(userId))
             {
-                token = newAccessToken,
-                refreshToken = newRefreshToken
-            });
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user != null)
+                {
+                    // Invalidate the stored refresh token so it cannot be reused
+                    user.RefreshToken = null;
+                    user.RefreshTokenExpiryTime = null;
+                    await _userManager.UpdateAsync(user);
+                }
+            }
+
+            ClearJwtCookie();
+            return NoContent();
         }
 
         private async Task<List<Claim>> BuildClaimsAsync(AppUser user)
