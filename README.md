@@ -1,197 +1,140 @@
-# JMAPI
+# Kaza Dashboard — Backend API
 
-## Overview
+ASP.NET Core Web API powering the [Kaza Dashboard](https://github.com/moee98/JM-Frontend) business management system. Handles job management, customer and vehicle records, invoicing, expenses, authentication, and third-party integrations.
 
-`OrderManagementAPI` is an ASP.NET Core Web API for managing workshop and order flow data.
-The API currently uses:
+## Features
 
-- ASP.NET Core on `net10.0`
-- Entity Framework Core with SQL Server
-- ASP.NET Identity with `AppUser`
-- JWT bearer authentication
-- Swagger / OpenAPI in Development
+- **Jobs** — full CRUD for work orders including status tracking, assigned technician, and service line items
+- **Customers & vehicles** — linked customer and vehicle records with vehicle inspection support
+- **Invoicing** — automated HTML invoice generation with VAT calculation, sent to customers via SMTP email (MailKit)
+- **Expenses** — expense items with category management and file attachments (images and PDFs stored in DB)
+- **Payments** — multiple payment methods per job with amount tracking
+- **Integrations** — OAuth token storage for eBay and Square
+- **Notifications** — per-user in-app notification management
+- **Authentication** — ASP.NET Core Identity with JWT access tokens (HttpOnly cookies) and refresh tokens
+- **Role-based access** — User and Admin roles enforced on endpoints
 
-The main business areas in the project are:
+## Tech Stack
 
-- authentication and user identity
-- jobs / work orders
-- customers
-- vehicles
-- vehicle inspections
-- services and job services
-- expense items and expense categories
-- company details
-- payment methods
+| Area | Technology |
+|------|-----------|
+| Framework | ASP.NET Core (.NET 10) |
+| Language | C# |
+| ORM | Entity Framework Core |
+| Database | Microsoft SQL Server |
+| Auth | ASP.NET Core Identity, JWT |
+| Email | MailKit (SMTP) |
+| Containerisation | Docker |
+| Testing | xUnit, WebApplicationFactory |
 
-## Solution Layout
-
-Root project:
-
-- `JMAPI.csproj`: main API project
-- `Program.cs`: application startup, DI, auth, CORS, Swagger
-- `Database/`: EF Core `AppDbContext` and design-time factory
-- `Controllers/`: API endpoints
-- `Services/`: application services used by selected controllers
-- `Models/`: EF entities and request models
-- `Migrations/`: EF Core migration history
-- `Properties/launchSettings.json`: local launch profiles
-- `JMAPI.Tests/`: integration test project
-
-## Main Runtime Flow
-
-### Authentication
-
-Identity is the active user system for the application.
-
-- `AppUser` extends `IdentityUser`
-- registration creates an Identity user and assigns the default `User` role
-- login issues a short-lived access token and refresh token
-- refresh validates the stored refresh token and issues a new access token
-
-JWT configuration is read from:
-
-- `JwtSettings:Key`
-- `JwtSettings:Issuer`
-- `JwtSettings:Audience`
-
-### Database
-
-The application uses `AppDbContext` in `Database/DbContext.cs`.
-
-Important note:
-
-- the active runtime user model is `AppUser`
-- historical migrations still contain older schema history from the pre-Identity user model
-- if database cleanup is needed, add a new EF migration rather than editing old migrations
-
-## Local Development
+## Getting Started
 
 ### Prerequisites
 
 - .NET 10 SDK
-- SQL Server reachable from your machine
-- a valid connection string for `DefaultConnection`
+- SQL Server (local or Docker)
 
 ### Configuration
 
-Current config files:
+Copy and fill in the required settings in `appsettings.json` or use user secrets:
 
-- `appsettings.json`
-- `appsettings.Development.json`
-
-At minimum, these settings must be valid:
-
-- `ConnectionStrings:DefaultConnection`
-- `JwtSettings:Key`
-- `JwtSettings:Issuer`
-- `JwtSettings:Audience`
-
-Recommended:
-
-- keep secrets out of source control
-- move connection strings and JWT secrets to user secrets or environment variables
-
-### Run the API
-
-From the repository root:
-
-```powershell
-dotnet run --project JMAPI.csproj
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=...;Database=KazaDB;..."
+  },
+  "JwtSettings": {
+    "Key": "your-secret-key",
+    "Issuer": "http://localhost:5173",
+    "Audience": "http://localhost:5173"
+  },
+  "Smtp": {
+    "Host": "smtp.example.com",
+    "Port": 587,
+    "Username": "you@example.com",
+    "Password": "your-app-password",
+    "From": "Kaza Dashboard"
+  }
+}
 ```
 
-Launch settings currently expose:
-
-- HTTPS on `https://0.0.0.0:7230`
-- HTTP on `http://0.0.0.0:5114`
-
-Swagger is enabled in Development.
-
-### Restore and Build
+### Run locally
 
 ```powershell
 dotnet restore
-dotnet build
+dotnet run --project JMAPI.csproj
 ```
 
-## API Surface
+Swagger UI is available at `https://localhost:7230/swagger` in Development.
 
-Current controller groups include:
+### Docker
 
-- `api/Auth`
-- `api/Users`
-- `api/Job`
-- `api/Customers`
-- `api/Vehicles`
-- `api/VehicleInspections`
-- `api/Services`
-- `api/JobServices`
-- `api/ExpenseItems`
-- `api/Company`
+A `Dockerfile` is included for containerised deployment. It is intended to be used via Docker Compose from the frontend repo:
 
-Most business controllers require authentication.
+```bash
+docker compose up -d
+```
 
-### Attachment Uploads
+For standalone build:
 
-Expense items and vehicle inspections now support storing image and PDF attachments directly in the database.
+```bash
+docker build -t kaza-api .
+docker run -p 5000:5000 kaza-api
+```
 
-Supported files:
+## API Endpoints
 
-- images such as `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`
-- `.pdf`
+| Group | Base path |
+|-------|-----------|
+| Auth | `POST /api/Auth/login`, `POST /api/Auth/register`, `POST /api/Auth/refresh` |
+| Users | `GET /api/Users`, `GET /api/Users/{id}` |
+| Jobs | `GET/POST /api/Job`, `GET/PUT/DELETE /api/Job/{id}`, `POST /api/Job/{id}/send-invoice` |
+| Customers | `GET/POST /api/Customers`, `GET/PUT/DELETE /api/Customers/{id}` |
+| Vehicles | `GET/POST /api/Vehicles`, `GET/PUT/DELETE /api/Vehicles/{id}` |
+| Services | `GET/POST /api/Services`, `GET/PUT/DELETE /api/Services/{id}` |
+| Job Services | `GET/POST /api/JobServices`, `PUT/DELETE /api/JobServices/{id}` |
+| Expenses | `GET/POST /api/ExpenseItems`, `POST /api/ExpenseItems/{id}/attachments` |
+| Company | `GET/PUT /api/Company` |
+| Payments | `GET/POST /api/PaymentMethods` |
+| Integrations | `GET/POST /api/Integrations` |
+| Notifications | `GET/POST/DELETE /api/Notifications` |
 
-Expense item attachment flow:
+Most endpoints require a valid JWT. Admin-only endpoints are marked with `[Authorize(Roles = "Admin")]`.
 
-1. create the expense item with `POST /api/ExpenseItems`
-2. upload one or more files with `POST /api/ExpenseItems/{id}/attachments` using `multipart/form-data`
-3. view attachment metadata from `GET /api/ExpenseItems/{id}`
-4. download a file from `GET /api/ExpenseItems/{id}/attachments/{attachmentId}`
+## Project Structure
 
-Vehicle inspection attachment flow:
-
-1. create the inspection with `POST /api/VehicleInspections`
-2. upload one or more files with `POST /api/VehicleInspections/{id}/attachments` using `multipart/form-data`
-3. view attachment metadata from `GET /api/VehicleInspections/{id}`
-4. download a file from `GET /api/VehicleInspections/{id}/attachments/{attachmentId}`
-
-For the upload routes, use the form field name `Files`.
+```
+├── Controllers/        # API route handlers
+├── Services/           # Business logic
+├── Interfaces/         # Service contracts
+├── Models/             # EF entities and request models
+├── Database/           # AppDbContext and design-time factory
+├── Migrations/         # EF Core migration history
+├── appsettings.json    # Base configuration
+├── appsettings.Production.json  # Production overrides
+├── Dockerfile
+└── JMAPI.Tests/        # Integration test project
+```
 
 ## Testing
 
-The repository includes an integration test project at `JMAPI.Tests`.
-
-Run all tests:
+The project includes an integration test suite using a real `WebApplicationFactory` with an in-memory SQLite database.
 
 ```powershell
 dotnet test JMAPI.Tests\JMAPI.Tests.csproj
 ```
 
-List discovered tests:
+Current coverage: `AuthController`, `UsersController`, `JobController`, `ExpenseItemsController`.
 
-```powershell
-dotnet test JMAPI.Tests\JMAPI.Tests.csproj --list-tests
-```
+## Production Deployment
 
-Show detailed per-test console output:
+`appsettings.Production.json` contains overrides for self-hosted deployment including:
+- SQL Server connection string
+- Kestrel bound to `http://localhost:5000`
+- `Cookies:Secure = false` for HTTP-only LAN deployments
 
-```powershell
-dotnet test JMAPI.Tests\JMAPI.Tests.csproj --logger "console;verbosity=detailed"
-```
+The `Cookies:Secure` flag is made configurable so the JWT cookie works correctly on HTTP without requiring HTTPS on a local network.
 
-For test project details, see `JMAPI.Tests/README.md`.
+## License
 
-## Current Test Coverage
-
-The initial integration suite currently covers:
-
-- `AuthController`
-- `UsersController`
-- `ExpenseItemsController`
-- `JobController`
-
-The tests use a custom `WebApplicationFactory` and override the production SQL Server database with in-memory SQLite for repeatable test runs.
-
-## Notes
-
-- `JMAPI.Tests` is nested under the main project folder, so the main project explicitly excludes that folder from its compile items in `JMAPI.csproj`
-- if you add new test folders under `JMAPI.Tests`, they will still be excluded correctly by that rule
-- if you move the test project elsewhere, update the solution and any relative project references
+MIT License — Copyright (c) 2026 Mahomed Ebrahim
