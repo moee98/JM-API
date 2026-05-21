@@ -49,7 +49,6 @@ namespace JMAPI.Services
         {
             var token = await GetTokenAsync(provider) ?? throw new InvalidOperationException($"{provider} is not connected.");
 
-            // Refresh if within 5 minutes of expiry
             if (token.ExpiresAt <= DateTime.UtcNow.AddMinutes(5))
             {
                 if (string.IsNullOrEmpty(token.RefreshToken))
@@ -68,7 +67,7 @@ namespace JMAPI.Services
         {
             var appId = _config["Square:AppId"];
             var redirectUri = Uri.EscapeDataString(_config["Square:RedirectUri"] ?? "");
-            return $"https://connect.squareup.com/oauth2/authorize?client_id={appId}&scope=PAYMENTS_READ+ORDERS_READ&redirect_uri={redirectUri}&response_type=code";
+            return $"https://connect.squareup.com/oauth2/authorize?client_id={appId}&scope=PAYMENTS_READ+PAYMENTS_WRITE+ORDERS_READ+DEVICE_CODE_PAIRS_READ&redirect_uri={redirectUri}&response_type=code";
         }
 
         public async Task<bool> ExchangeSquareCodeAsync(string code)
@@ -95,7 +94,7 @@ namespace JMAPI.Services
             var refreshToken = json.TryGetProperty("refresh_token", out var rt) ? rt.GetString() : null;
             var expiresAt = json.TryGetProperty("expires_at", out var exp) ? exp.GetString() : null;
 
-            int expiresIn = 7776000; // Square tokens default to 90 days
+            int expiresIn = 7776000;
             if (expiresAt is not null && DateTime.TryParse(expiresAt, out var expDate))
                 expiresIn = (int)(expDate - DateTime.UtcNow).TotalSeconds;
 
@@ -263,6 +262,110 @@ namespace JMAPI.Services
                 Today = Summarise(result.Transactions, todayStart),
                 ThisWeek = Summarise(result.Transactions, weekStart),
                 ThisMonth = Summarise(result.Transactions, monthStart)
+            };
+        }
+
+        // ── Square Terminal ──────────────────────────────────────────────────
+
+        public async Task<SquareDevicesResult> GetSquareDevicesAsync()
+        {
+            var accessToken = await GetValidAccessTokenAsync("square");
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Add("Square-Version", "2024-01-17");
+
+            var response = await client.GetAsync("https://connect.squareup.com/v2/devices");
+            if (!response.IsSuccessStatusCode) return new SquareDevicesResult();
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var devices = new List<SquareDevice>();
+
+            if (json.TryGetProperty("devices", out var devicesEl))
+            {
+                foreach (var d in devicesEl.EnumerateArray())
+                {
+                    var device = new SquareDevice
+                    {
+                        Id = d.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                        Status = d.TryGetProperty("status", out var st) ? st.GetString() ?? "" : ""
+                    };
+
+                    if (d.TryGetProperty("attributes", out var attrs))
+                        device.Name = attrs.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "";
+
+                    devices.Add(device);
+                }
+            }
+
+            return new SquareDevicesResult { Devices = devices };
+        }
+
+        public async Task<TerminalCheckoutResult> CreateTerminalCheckoutAsync(long amountMoney, string currency, string deviceId, string referenceId)
+        {
+            var accessToken = await GetValidAccessTokenAsync("square");
+            var locationId = _config["Square:LocationId"] ?? throw new InvalidOperationException("Square:LocationId is not configured. Add it to appsettings.json.");
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Add("Square-Version", "2024-01-17");
+
+            var payload = new
+            {
+                idempotency_key = Guid.NewGuid().ToString(),
+                checkout = new
+                {
+                    amount_money = new { amount = amountMoney, currency },
+                    reference_id = referenceId,
+                    device_options = new { device_id = deviceId },
+                    location_id = locationId
+                }
+            };
+
+            var response = await client.PostAsJsonAsync("https://connect.squareup.com/v2/terminals/checkouts", payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException($"Failed to create terminal checkout: {response.StatusCode} — {errorBody}");
+            }
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (!json.TryGetProperty("checkout", out var checkout))
+                throw new InvalidOperationException("Unexpected response from Square Terminal API.");
+
+            return new TerminalCheckoutResult
+            {
+                CheckoutId = checkout.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "",
+                Status = checkout.TryGetProperty("status", out var st) ? st.GetString() ?? "" : ""
+            };
+        }
+
+        public async Task<TerminalCheckoutStatus> GetTerminalCheckoutAsync(string checkoutId)
+        {
+            var accessToken = await GetValidAccessTokenAsync("square");
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            client.DefaultRequestHeaders.Add("Square-Version", "2024-01-17");
+
+            var response = await client.GetAsync($"https://connect.squareup.com/v2/terminals/checkouts/{checkoutId}");
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Failed to get terminal checkout status.");
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (!json.TryGetProperty("checkout", out var checkout))
+                throw new InvalidOperationException("Unexpected response from Square Terminal API.");
+
+            string? squarePaymentId = null;
+            if (checkout.TryGetProperty("payment_ids", out var paymentIds))
+            {
+                var arr = paymentIds.EnumerateArray().ToList();
+                if (arr.Count > 0) squarePaymentId = arr[0].GetString();
+            }
+
+            return new TerminalCheckoutStatus
+            {
+                CheckoutId = checkoutId,
+                Status = checkout.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "",
+                SquarePaymentId = squarePaymentId
             };
         }
 

@@ -1,14 +1,14 @@
-﻿namespace JMAPI.Models
+namespace JMAPI.Models
 {
     public class PaymentMethods
     {
-        public int Id { get; set; } // Unique identifier for the payment method
-        public required string MethodName { get; set; } // Name of the payment method (e.g., "Credit Card", "PayPal")
-        public bool IsActive { get; set; } = true; // Indicates if the payment method is currently active
+        public int Id { get; set; }
+        public required string MethodName { get; set; }
+        public bool IsActive { get; set; } = true;
         public int JobId { get; set; }
         public long Amount { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow; // Timestamp when the payment method was added
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow; // Timestamp when the payment method was last updated
-
+        public string? SquarePaymentId { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

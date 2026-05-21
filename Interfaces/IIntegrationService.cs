@@ -22,6 +22,11 @@ namespace JMAPI.Interfaces
         Task<SquareTransactionsResult> GetSquareTransactionsAsync();
         Task<SquareSummaryResult> GetSquareSummaryAsync();
 
+        // Square Terminal
+        Task<SquareDevicesResult> GetSquareDevicesAsync();
+        Task<TerminalCheckoutResult> CreateTerminalCheckoutAsync(long amountMoney, string currency, string deviceId, string referenceId);
+        Task<TerminalCheckoutStatus> GetTerminalCheckoutAsync(string checkoutId);
+
         // eBay data
         Task<EbayOrdersResult> GetEbayOrdersAsync();
         Task<EbayListingsResult> GetEbayListingsAsync();
@@ -33,7 +38,7 @@ namespace JMAPI.Interfaces
     public class SquareTransaction
     {
         public string Id { get; set; } = "";
-        public long AmountMoney { get; set; }       // in smallest currency unit (pence)
+        public long AmountMoney { get; set; }
         public string Currency { get; set; } = "GBP";
         public string Status { get; set; } = "";
         public string? CardBrand { get; set; }
@@ -57,6 +62,31 @@ namespace JMAPI.Interfaces
     public class SquareTransactionsResult
     {
         public List<SquareTransaction> Transactions { get; set; } = [];
+    }
+
+    public class SquareDevice
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+
+    public class SquareDevicesResult
+    {
+        public List<SquareDevice> Devices { get; set; } = [];
+    }
+
+    public class TerminalCheckoutResult
+    {
+        public string CheckoutId { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+
+    public class TerminalCheckoutStatus
+    {
+        public string CheckoutId { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string? SquarePaymentId { get; set; }
     }
 
     // ── eBay result types ────────────────────────────────────────────────────

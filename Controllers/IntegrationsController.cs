@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace JMAPI.Controllers
 {
+    public record CreateTerminalCheckoutRequest(long AmountMoney, string DeviceId, int JobId);
+
     [ApiController]
     [Route("api/integrations")]
     [Authorize]
@@ -73,6 +75,51 @@ namespace JMAPI.Controllers
             try
             {
                 var result = await _integrationService.GetSquareSummaryAsync();
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        // ── Square Terminal ──────────────────────────────────────────────────
+
+        [HttpGet("square/devices")]
+        public async Task<IActionResult> SquareDevices()
+        {
+            try
+            {
+                var result = await _integrationService.GetSquareDevicesAsync();
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("square/terminal/checkout")]
+        public async Task<IActionResult> CreateTerminalCheckout([FromBody] CreateTerminalCheckoutRequest request)
+        {
+            try
+            {
+                var result = await _integrationService.CreateTerminalCheckoutAsync(
+                    request.AmountMoney, "GBP", request.DeviceId, $"job-{request.JobId}");
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("square/terminal/checkout/{checkoutId}")]
+        public async Task<IActionResult> GetTerminalCheckout(string checkoutId)
+        {
+            try
+            {
+                var result = await _integrationService.GetTerminalCheckoutAsync(checkoutId);
                 return Ok(result);
             }
             catch (InvalidOperationException ex)
@@ -168,8 +215,6 @@ namespace JMAPI.Controllers
 
         private string GetFrontendBase()
         {
-            // Use the first allowed origin as the frontend base
-            // Falls back to localhost in development
             var origins = _config.GetSection("Cors:AllowedOrigins").Get<string[]>();
             if (origins?.Length > 0) return origins[0].TrimEnd('/');
 
