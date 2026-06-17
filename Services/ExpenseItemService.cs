@@ -65,5 +65,13 @@ namespace JMAPI.Services
             return await _context.ExpenseCategory.ToListAsync();
         }
 
+        public async Task<ExpenseCategory> CreateExpenseCategory(string name)
+        {
+            var category = new ExpenseCategory { Name = name };
+            _context.ExpenseCategory.Add(category);
+            await _context.SaveChangesAsync();
+            return category;
+        }
+
     }
 }

@@ -54,6 +54,18 @@ namespace JMAPI.Controllers
             return Ok(items);
         }
 
+        [HttpPost("category")]
+        public async Task<IActionResult> CreateExpenseCategory([FromBody] ExpenseCategory request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Name))
+            {
+                return BadRequest("Category name is required.");
+            }
+
+            var created = await _expenseItem.CreateExpenseCategory(request.Name.Trim());
+            return Ok(created);
+        }
+
         [HttpPut("{id}")]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateExpenseItem(int id, [FromBody] ExpenseItem request)

@@ -9,5 +9,6 @@ namespace JMAPI.Interfaces
         Task<bool> UpdateAsync(ExpenseItem job);
         Task<bool> DeleteAsync(int id);
         Task<IList<ExpenseCategory>> GetExpenseCategories();
+        Task<ExpenseCategory> CreateExpenseCategory(string name);
     }
 }
