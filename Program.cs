@@ -17,8 +17,21 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 // ✅ REMOVE Microsoft Identity Web if not needed
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Registered as a singleton so the "which database is active" flag is
+// shared across all requests/users - see ActiveDatabaseProvider.
+builder.Services.AddSingleton<IActiveDatabaseProvider, ActiveDatabaseProvider>();
+
+// The (serviceProvider, options) overload is re-invoked for every scoped
+// AppDbContext (i.e. every request), so toggling ActiveDatabaseProvider's
+// mode takes effect on the very next request - no restart required.
+builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+{
+    var activeDatabase = serviceProvider.GetRequiredService<IActiveDatabaseProvider>();
+    var connectionStringName = activeDatabase.IsTestMode ? "TestConnection" : "DefaultConnection";
+    var connectionString = builder.Configuration.GetConnectionString(connectionStringName)
+        ?? throw new InvalidOperationException($"Connection string '{connectionStringName}' is not configured.");
+    options.UseSqlServer(connectionString);
+});
 
 builder.Services.AddControllers()
      .AddJsonOptions(options =>
@@ -100,12 +113,24 @@ builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
 var app = builder.Build();
 
-// Apply pending EF Core migrations on startup, creating the database if it doesn't exist yet.
+// Apply pending EF Core migrations on startup, creating the database if it
+// doesn't exist yet. Both the live and test databases are migrated
+// regardless of which is currently active, so switching between them is
+// always safe (the test DB might not have been touched in a while).
+foreach (var connectionStringName in new[] { "DefaultConnection", "TestConnection" })
+{
+    var connectionString = config.GetConnectionString(connectionStringName);
+    if (string.IsNullOrWhiteSpace(connectionString)) continue;
+
+    var options = new DbContextOptionsBuilder<AppDbContext>()
+        .UseSqlServer(connectionString)
+        .Options;
+    using var db = new AppDbContext(options);
+    db.Database.Migrate();
+}
+
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-
     // Seed the Admin/User roles and, if nobody holds the Admin role yet,
     // grant it to a known bootstrap account so a fresh install has one
     // usable admin without a manual database step.
