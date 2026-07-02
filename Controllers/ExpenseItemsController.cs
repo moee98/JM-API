@@ -22,10 +22,11 @@ namespace JMAPI.Controllers
             _context = context;
         }
 
+        // GET: api/ExpenseItems?from=2026-01-01&to=2026-01-31
         [HttpGet]
-        public async Task<IActionResult> GetExpenseItems()
+        public async Task<IActionResult> GetExpenseItems([FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
         {
-            var items = await _expenseItem.GetAllAsync();
+            var items = await _expenseItem.GetAllAsync(from, to);
             return Ok(items.Select(MapExpenseItem));
         }
 

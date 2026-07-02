@@ -3,7 +3,7 @@ namespace JMAPI.Interfaces
 {
     public interface IExpenseItemsService
     {
-        Task<List<ExpenseItem>> GetAllAsync();
+        Task<List<ExpenseItem>> GetAllAsync(DateTime? from = null, DateTime? to = null);
         Task<ExpenseItem?> GetByIdAsync(int id);
         Task<ExpenseItem> CreateAsync(ExpenseItem job);
         Task<bool> UpdateAsync(ExpenseItem job);

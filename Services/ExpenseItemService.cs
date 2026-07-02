@@ -16,10 +16,24 @@ namespace JMAPI.Services
             _context = context;
         }
 
-        public async Task<List<ExpenseItem>> GetAllAsync() =>
-            await _context.ExpenseItems
-                .Include(x => x.Attachments)
-                .ToListAsync();
+        public async Task<List<ExpenseItem>> GetAllAsync(DateTime? from = null, DateTime? to = null)
+        {
+            var query = _context.ExpenseItems.Include(x => x.Attachments).AsQueryable();
+
+            if (from.HasValue)
+            {
+                query = query.Where(x => x.DateIncurred >= from.Value.Date);
+            }
+
+            if (to.HasValue)
+            {
+                // Treat "to" as inclusive of the whole day regardless of its time component.
+                var exclusiveEnd = to.Value.Date.AddDays(1);
+                query = query.Where(x => x.DateIncurred < exclusiveEnd);
+            }
+
+            return await query.ToListAsync();
+        }
 
         public async Task<ExpenseItem?> GetByIdAsync(int id) =>
             await _context.ExpenseItems
