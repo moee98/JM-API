@@ -33,7 +33,7 @@ namespace JMAPI.Controllers
                 return NotFound();
             }
 
-            return Ok(CreateUserResponse(user));
+            return Ok(await CreateUserResponseAsync(user));
         }
 
         [HttpGet("name/{id}")]
@@ -53,6 +53,19 @@ namespace JMAPI.Controllers
             return Ok(user.Name);
         }
 
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var responses = new List<object>();
+            foreach (var user in _userManager.Users.ToList())
+            {
+                responses.Add(await CreateUserResponseAsync(user));
+            }
+
+            return Ok(responses);
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUserById(string id)
         {
@@ -67,7 +80,7 @@ namespace JMAPI.Controllers
                 return NotFound();
             }
 
-            return Ok(CreateUserResponse(user));
+            return Ok(await CreateUserResponseAsync(user));
         }
 
         [HttpPost("change-password")]
@@ -101,13 +114,91 @@ namespace JMAPI.Controllers
             return NoContent();
         }
 
-        private static object CreateUserResponse(AppUser user) => new
+        [HttpPost("{id}/role")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> SetUserRole(string id, [FromBody] SetUserRoleRequest request)
         {
-            user.Id,
-            user.UserName,
-            user.Email,
-            user.Name,
-            user.PhoneNumber
-        };
+            if (request is null || (request.Role != "Admin" && request.Role != "User"))
+            {
+                return BadRequest("Role must be 'Admin' or 'User'.");
+            }
+
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (user.Id == currentUserId && request.Role != "Admin")
+            {
+                // A lone admin demoting themselves would lock everyone out of
+                // user management until someone edits the database directly.
+                return BadRequest("You cannot remove your own Admin role.");
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            if (currentRoles.Count > 0)
+            {
+                await _userManager.RemoveFromRolesAsync(user, currentRoles);
+            }
+            await _userManager.AddToRoleAsync(user, request.Role);
+
+            return Ok(await CreateUserResponseAsync(user));
+        }
+
+        [HttpPost("{id}/deactivate")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeactivateUser(string id)
+        {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (id == currentUserId)
+            {
+                return BadRequest("You cannot deactivate your own account.");
+            }
+
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            await _userManager.SetLockoutEnabledAsync(user, true);
+            await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+
+            return Ok(await CreateUserResponseAsync(user));
+        }
+
+        [HttpPost("{id}/reactivate")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ReactivateUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            await _userManager.SetLockoutEndDateAsync(user, null);
+
+            return Ok(await CreateUserResponseAsync(user));
+        }
+
+        private async Task<object> CreateUserResponseAsync(AppUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            var isLockedOut = await _userManager.IsLockedOutAsync(user);
+
+            return new
+            {
+                user.Id,
+                user.UserName,
+                user.Email,
+                user.Name,
+                user.PhoneNumber,
+                Roles = roles,
+                IsActive = !isLockedOut
+            };
+        }
     }
 }

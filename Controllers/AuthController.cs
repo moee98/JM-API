@@ -112,6 +112,18 @@ namespace JMAPI.Controllers
                 return Unauthorized();
             }
 
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                // Distinct from the generic 401 above: the caller already proved
+                // they know the password, so this doesn't leak account
+                // existence - it's just telling a legitimate user why they're
+                // blocked.
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Your account has been deactivated. Contact an administrator."
+                });
+            }
+
             var claims = await BuildClaimsAsync(user);
 
             var accessToken = _tokenService.GenerateAccessToken(claims);

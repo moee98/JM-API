@@ -105,6 +105,34 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    // Seed the Admin/User roles and, if nobody holds the Admin role yet,
+    // grant it to a known bootstrap account so a fresh install has one
+    // usable admin without a manual database step.
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+
+    foreach (var roleName in new[] { "Admin", "User" })
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new IdentityRole(roleName));
+        }
+    }
+
+    var existingAdmins = await userManager.GetUsersInRoleAsync("Admin");
+    if (existingAdmins.Count == 0)
+    {
+        var bootstrapAdminEmail = config["Bootstrap:AdminEmail"];
+        if (!string.IsNullOrWhiteSpace(bootstrapAdminEmail))
+        {
+            var bootstrapAdmin = await userManager.FindByEmailAsync(bootstrapAdminEmail);
+            if (bootstrapAdmin != null)
+            {
+                await userManager.AddToRoleAsync(bootstrapAdmin, "Admin");
+            }
+        }
+    }
 }
 
 app.UseCors("AllowFrontend");
