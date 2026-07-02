@@ -82,6 +82,64 @@ namespace JMAPI.Services
             await client.DisconnectAsync(true);
         }
 
+        public async Task SendPasswordResetAsync(string toEmail, string resetLink)
+        {
+            var from = _config["Smtp:From"]
+                ?? throw new InvalidOperationException("Smtp:From is not configured.");
+
+            var message = new MimeMessage();
+            message.From.Add(MailboxAddress.Parse(from));
+            message.To.Add(MailboxAddress.Parse(toEmail));
+            message.Subject = "Reset your password";
+
+            var builder = new BodyBuilder { HtmlBody = BuildPasswordResetHtml(resetLink) };
+            message.Body = builder.ToMessageBody();
+
+            var host = _config["Smtp:Host"] ?? throw new InvalidOperationException("Smtp:Host is not configured.");
+            var port = int.Parse(_config["Smtp:Port"] ?? "587");
+            var username = _config["Smtp:Username"];
+            var password = _config["Smtp:Password"];
+
+            using var client = new SmtpClient();
+            await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                await client.AuthenticateAsync(username, password);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+        }
+
+        private static string BuildPasswordResetHtml(string resetLink)
+        {
+            var encodedLink = System.Web.HttpUtility.HtmlEncode(resetLink);
+            return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+<meta charset=""UTF-8"" />
+<meta name=""viewport"" content=""width=device-width,initial-scale=1"" />
+<style>
+  body{{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;margin:0;padding:0;}}
+  .wrapper{{max-width:480px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);}}
+  .header{{background:#1a1a2e;color:#fff;padding:32px 40px;}}
+  .header h1{{margin:0;font-size:22px;}}
+  .body{{padding:32px 40px;font-size:14px;color:#333;line-height:1.6;}}
+  .button{{display:inline-block;margin-top:16px;padding:12px 24px;background:#1a56db;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;}}
+  .footer{{background:#f9f9f9;padding:20px 40px;text-align:center;font-size:12px;color:#888;border-top:1px solid #eee;}}
+</style>
+</head>
+<body>
+<div class=""wrapper"">
+  <div class=""header""><h1>Reset your password</h1></div>
+  <div class=""body"">
+    <p>We received a request to reset your password. Click the button below to choose a new one.</p>
+    <a class=""button"" href=""{encodedLink}"">Reset password</a>
+    <p style=""margin-top:24px;font-size:12px;color:#888;"">If you didn't request this, you can safely ignore this email.</p>
+  </div>
+  <div class=""footer"">Kaza Performance Ltd</div>
+</div>
+</body>
+</html>";
+        }
+
         private static string BuildReminderHtml(Job job)
         {
             var invoiceHtml = BuildInvoiceHtml(job);

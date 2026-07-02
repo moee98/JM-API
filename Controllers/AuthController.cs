@@ -1,3 +1,4 @@
+using JMAPI.Interfaces;
 using JMAPI.Models;
 using JMAPI.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -16,19 +17,22 @@ namespace JMAPI.Controllers
         private readonly TokenService _tokenService;
         private readonly IHostEnvironment _env;
         private readonly IConfiguration _config;
+        private readonly IEmailService _emailService;
 
         public AuthController(
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
             TokenService tokenService,
             IHostEnvironment env,
-            IConfiguration config)
+            IConfiguration config,
+            IEmailService emailService)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _tokenService = tokenService;
             _env = env;
             _config = config;
+            _emailService = emailService;
         }
 
         // Whether the JWT cookie requires HTTPS. Defaults to true in production
@@ -211,6 +215,72 @@ namespace JMAPI.Controllers
             }
 
             ClearJwtCookie();
+            return NoContent();
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest("Email is required.");
+            }
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user != null && !string.IsNullOrWhiteSpace(user.Email))
+            {
+                try
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var frontendUrl = _config["Frontend:BaseUrl"]?.TrimEnd('/')
+                        ?? throw new InvalidOperationException("Frontend:BaseUrl is not configured.");
+                    var resetLink =
+                        $"{frontendUrl}/reset-password?email={Uri.EscapeDataString(user.Email)}&token={Uri.EscapeDataString(token)}";
+
+                    await _emailService.SendPasswordResetAsync(user.Email, resetLink);
+                }
+                catch
+                {
+                    // Swallow send failures here so the response below doesn't
+                    // become a way to distinguish "account exists but email
+                    // failed" from "account doesn't exist".
+                }
+            }
+
+            // Always return the same response whether or not the email is
+            // registered, to avoid leaking which accounts exist.
+            return Ok(new { message = "If that email is registered, a reset link has been sent." });
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (request is null ||
+                string.IsNullOrWhiteSpace(request.Email) ||
+                string.IsNullOrWhiteSpace(request.Token) ||
+                string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return BadRequest("Email, token, and new password are required.");
+            }
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                // Same generic error whether the account exists or the token
+                // is simply invalid - avoids leaking account existence.
+                return BadRequest("Invalid or expired reset link.");
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
+            if (!result.Succeeded)
+            {
+                if (result.Errors.Any(e => e.Code.Contains("Token", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return BadRequest("Invalid or expired reset link.");
+                }
+                return BadRequest(result.Errors.Select(e => e.Description));
+            }
+
             return NoContent();
         }
 

@@ -4,5 +4,6 @@ namespace JMAPI.Interfaces
     {
         Task SendInvoiceAsync(int jobId);
         Task SendPaymentReminderAsync(int jobId);
+        Task SendPasswordResetAsync(string toEmail, string resetLink);
     }
 }
