@@ -114,7 +114,7 @@ namespace JMAPI.Controllers
             var refreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
 
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -177,6 +177,10 @@ namespace JMAPI.Controllers
             var newRefreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
+            // Reset the expiry on every successful refresh so the session is a true
+            // sliding window (an active user is never logged out), not a fixed
+            // expiry counted from the original login.
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
             {
