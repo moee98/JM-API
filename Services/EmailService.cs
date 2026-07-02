@@ -26,28 +26,7 @@ namespace JMAPI.Services
             if (string.IsNullOrWhiteSpace(job.Customer?.Email))
                 throw new InvalidOperationException("Customer does not have an email address on file.");
 
-            var from = _config["Smtp:From"]
-                ?? throw new InvalidOperationException("Smtp:From is not configured.");
-
-            var message = new MimeMessage();
-            message.From.Add(MailboxAddress.Parse(from));
-            message.To.Add(MailboxAddress.Parse(job.Customer.Email));
-            message.Subject = $"Your Invoice – Job #{job.Id}";
-
-            var builder = new BodyBuilder { HtmlBody = BuildInvoiceHtml(job) };
-            message.Body = builder.ToMessageBody();
-
-            var host = _config["Smtp:Host"] ?? throw new InvalidOperationException("Smtp:Host is not configured.");
-            var port = int.Parse(_config["Smtp:Port"] ?? "587");
-            var username = _config["Smtp:Username"];
-            var password = _config["Smtp:Password"];
-
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
-            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
-                await client.AuthenticateAsync(username, password);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
+            await SendEmailAsync(job.Customer.Email, $"Your Invoice – Job #{job.Id}", BuildInvoiceHtml(job));
         }
 
         public async Task SendPaymentReminderAsync(int jobId)
@@ -58,31 +37,47 @@ namespace JMAPI.Services
             if (string.IsNullOrWhiteSpace(job.Customer?.Email))
                 throw new InvalidOperationException("Customer does not have an email address on file.");
 
-            var from = _config["Smtp:From"]
-                ?? throw new InvalidOperationException("Smtp:From is not configured.");
-
-            var message = new MimeMessage();
-            message.From.Add(MailboxAddress.Parse(from));
-            message.To.Add(MailboxAddress.Parse(job.Customer.Email));
-            message.Subject = $"Payment Reminder – Invoice #{job.Id}";
-
-            var builder = new BodyBuilder { HtmlBody = BuildReminderHtml(job) };
-            message.Body = builder.ToMessageBody();
-
-            var host = _config["Smtp:Host"] ?? throw new InvalidOperationException("Smtp:Host is not configured.");
-            var port = int.Parse(_config["Smtp:Port"] ?? "587");
-            var username = _config["Smtp:Username"];
-            var password = _config["Smtp:Password"];
-
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
-            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
-                await client.AuthenticateAsync(username, password);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
+            await SendEmailAsync(job.Customer.Email, $"Payment Reminder – Invoice #{job.Id}", BuildReminderHtml(job));
         }
 
         public async Task SendPasswordResetAsync(string toEmail, string resetLink)
+        {
+            await SendEmailAsync(toEmail, "Reset your password", BuildPasswordResetHtml(resetLink));
+        }
+
+        public async Task SendBookingConfirmationAsync(int jobId)
+        {
+            var job = await _jobService.GetByIdWithDetailsAsync(jobId)
+                ?? throw new InvalidOperationException($"Job {jobId} not found.");
+
+            if (string.IsNullOrWhiteSpace(job.Customer?.Email))
+                throw new InvalidOperationException("Customer does not have an email address on file.");
+
+            var html = BuildBookingHtml(
+                job,
+                "Booking Confirmed",
+                "Thanks for booking with us. Here are your booking details:");
+
+            await SendEmailAsync(job.Customer.Email, $"Booking Confirmation – Job #{job.Id}", html);
+        }
+
+        public async Task SendBookingReminderAsync(int jobId)
+        {
+            var job = await _jobService.GetByIdWithDetailsAsync(jobId)
+                ?? throw new InvalidOperationException($"Job {jobId} not found.");
+
+            if (string.IsNullOrWhiteSpace(job.Customer?.Email))
+                throw new InvalidOperationException("Customer does not have an email address on file.");
+
+            var html = BuildBookingHtml(
+                job,
+                "Booking Reminder",
+                "This is a reminder of your upcoming booking with us:");
+
+            await SendEmailAsync(job.Customer.Email, $"Booking Reminder – Job #{job.Id}", html);
+        }
+
+        private async Task SendEmailAsync(string toEmail, string subject, string htmlBody)
         {
             var from = _config["Smtp:From"]
                 ?? throw new InvalidOperationException("Smtp:From is not configured.");
@@ -90,9 +85,9 @@ namespace JMAPI.Services
             var message = new MimeMessage();
             message.From.Add(MailboxAddress.Parse(from));
             message.To.Add(MailboxAddress.Parse(toEmail));
-            message.Subject = "Reset your password";
+            message.Subject = subject;
 
-            var builder = new BodyBuilder { HtmlBody = BuildPasswordResetHtml(resetLink) };
+            var builder = new BodyBuilder { HtmlBody = htmlBody };
             message.Body = builder.ToMessageBody();
 
             var host = _config["Smtp:Host"] ?? throw new InvalidOperationException("Smtp:Host is not configured.");
@@ -154,6 +149,96 @@ namespace JMAPI.Services
 
             // Inject the banner just after the opening of .body div
             return invoiceHtml.Replace(@"<div class=""body"">", $@"<div class=""body"">{banner}");
+        }
+
+        private static string BuildBookingHtml(Job job, string heading, string introText)
+        {
+            var services = job.JobServices ?? new List<JobServices>();
+            var bookingDate = job.DueDate.ToString("dd MMMM yyyy");
+
+            var sb = new StringBuilder();
+            sb.Append(@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+<meta charset=""UTF-8"" />
+<meta name=""viewport"" content=""width=device-width,initial-scale=1"" />
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;margin:0;padding:0;}
+  .wrapper{max-width:640px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+  .header{background:#1a1a2e;color:#fff;padding:32px 40px;}
+  .header h1{margin:0 0 4px;font-size:26px;}
+  .header p{margin:0;font-size:13px;color:#aaa;}
+  .body{padding:32px 40px;}
+  .intro{font-size:14px;color:#333;line-height:1.6;margin:0 0 8px;}
+  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:24px 0 8px;}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:4px;}
+  .info-label{font-size:11px;color:#888;margin-bottom:2px;}
+  .info-value{font-size:14px;font-weight:600;color:#111;}
+  ul.services{margin:8px 0 0;padding:0 0 0 18px;font-size:13px;color:#333;}
+  ul.services li{padding:2px 0;}
+  .footer{background:#f9f9f9;padding:20px 40px;text-align:center;font-size:12px;color:#888;border-top:1px solid #eee;}
+</style>
+</head>
+<body>
+<div class=""wrapper"">
+  <div class=""header"">
+    <h1>");
+            sb.Append(System.Web.HttpUtility.HtmlEncode(heading));
+            sb.Append(@"</h1>
+    <p>Job #");
+            sb.Append(job.Id);
+            sb.Append(@"</p>
+  </div>
+  <div class=""body"">
+    <p class=""intro"">");
+            sb.Append(System.Web.HttpUtility.HtmlEncode(introText));
+            sb.Append(@"</p>
+    <div class=""section-title"">Booking Details</div>
+    <div class=""info-grid"">
+      <div><div class=""info-label"">Date</div><div class=""info-value"">");
+            sb.Append(bookingDate);
+            sb.Append(@"</div></div>
+      <div><div class=""info-label"">Customer</div><div class=""info-value"">");
+            sb.Append(System.Web.HttpUtility.HtmlEncode(job.Customer?.Name ?? "-"));
+            sb.Append(@"</div></div>
+    </div>");
+
+            if (job.Vehicle != null)
+            {
+                sb.Append(@"
+    <div class=""section-title"">Vehicle</div>
+    <div class=""info-grid"">
+      <div><div class=""info-label"">Registration</div><div class=""info-value"">");
+                sb.Append(System.Web.HttpUtility.HtmlEncode(job.Vehicle.LicensePlate));
+                sb.Append(@"</div></div>
+      <div><div class=""info-label"">Make / Model</div><div class=""info-value"">");
+                sb.Append(System.Web.HttpUtility.HtmlEncode($"{job.Vehicle.Make} {job.Vehicle.Model}".Trim()));
+                sb.Append(@"</div></div>
+    </div>");
+            }
+
+            if (services.Count > 0)
+            {
+                sb.Append(@"
+    <div class=""section-title"">Work Booked</div>
+    <ul class=""services"">");
+                foreach (var js in services)
+                {
+                    sb.Append("<li>");
+                    sb.Append(System.Web.HttpUtility.HtmlEncode(js.Service?.Name ?? "Service"));
+                    sb.Append("</li>");
+                }
+                sb.Append("</ul>");
+            }
+
+            sb.Append(@"
+  </div>
+  <div class=""footer"">Please contact us if you have any questions or need to reschedule.</div>
+</div>
+</body>
+</html>");
+
+            return sb.ToString();
         }
 
         private static string BuildInvoiceHtml(Job job)

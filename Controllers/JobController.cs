@@ -146,6 +146,44 @@ namespace JMAPI.Controllers
             }
         }
 
+        // POST api/<JobController>/5/send-booking-confirmation
+        [HttpPost("{id}/send-booking-confirmation")]
+        public async Task<IActionResult> SendBookingConfirmation(int id)
+        {
+            try
+            {
+                await _emailService.SendBookingConfirmationAsync(id);
+                return Ok("Booking confirmation sent successfully.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        // POST api/<JobController>/5/send-booking-reminder
+        [HttpPost("{id}/send-booking-reminder")]
+        public async Task<IActionResult> SendBookingReminder(int id)
+        {
+            try
+            {
+                await _emailService.SendBookingReminderAsync(id);
+                return Ok("Booking reminder sent successfully.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
         // DELETE api/<JobController>/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
