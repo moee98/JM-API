@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,22 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.ConfigureLogging(logging => logging.ClearProviders());
 
+        // Blank the SQL Server connection strings so the migrate-on-startup loop
+        // in Program.cs skips them (it ignores whitespace-only entries). Tests run
+        // entirely on the in-memory Sqlite connection below.
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] = "",
+                ["ConnectionStrings:TestConnection"] = "",
+                // Locally this comes from user-secrets, which CI machines don't
+                // have. Any 32+ char value works — tokens are only validated
+                // against the same in-process key.
+                ["JwtSettings:Key"] = "integration-test-signing-key-0123456789"
+            });
+        });
+
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
@@ -35,6 +52,16 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             _connection = new SqliteConnection("Data Source=:memory:");
             _connection.Open();
+
+            // Create the schema up front: Program.cs seeds Identity roles during
+            // startup, which happens before InitializeAsync runs.
+            var schemaOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(_connection)
+                .Options;
+            using (var schemaContext = new AppDbContext(schemaOptions))
+            {
+                schemaContext.Database.EnsureCreated();
+            }
 
             services.AddSingleton<DbConnection>(_ => _connection!);
             services.AddDbContext<AppDbContext>((serviceProvider, options) =>
