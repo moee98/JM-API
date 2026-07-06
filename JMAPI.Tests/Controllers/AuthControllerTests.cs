@@ -63,15 +63,22 @@ public sealed class AuthControllerTests : IClassFixture<CustomWebApplicationFact
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
+        // The access token travels only as an HTTP-only cookie; the body
+        // carries the refresh token and the safe user payload.
+        response.Headers.TryGetValues("Set-Cookie", out var setCookies).Should().BeTrue();
+        setCookies.Should().Contain(cookie =>
+            cookie.StartsWith("jwt=") &&
+            !cookie.StartsWith("jwt=;") &&
+            cookie.Contains("httponly", StringComparison.OrdinalIgnoreCase));
+
         var payload = await response.Content.ReadFromJsonAsync<LoginResponse>();
         payload.Should().NotBeNull();
-        payload!.Token.Should().NotBeNullOrWhiteSpace();
-        payload.RefreshToken.Should().NotBeNullOrWhiteSpace();
+        payload!.RefreshToken.Should().NotBeNullOrWhiteSpace();
         payload.User.Email.Should().Be(email);
         payload.User.Name.Should().Be("Login User");
     }
 
     private sealed record UserResponse(string Id, string UserName, string Email, string? Name, string? PhoneNumber);
 
-    private sealed record LoginResponse(string Token, string RefreshToken, UserResponse User);
+    private sealed record LoginResponse(string RefreshToken, UserResponse User);
 }
