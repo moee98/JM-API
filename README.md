@@ -1,5 +1,9 @@
 # Kaza Dashboard — Backend API
 
+[![CI](https://github.com/moee98/JM-API/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/moee98/JM-API/actions/workflows/ci-cd.yml)
+[![Release](https://github.com/moee98/JM-API/actions/workflows/release-please.yml/badge.svg)](https://github.com/moee98/JM-API/actions/workflows/release-please.yml)
+[Latest release](https://github.com/moee98/JM-API/releases/latest)
+
 ASP.NET Core Web API powering the [Kaza Dashboard](https://github.com/moee98/JM-Frontend) business management system. Handles job management, customer and vehicle records, invoicing, expenses, authentication, and third-party integrations.
 
 ## Features
