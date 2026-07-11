@@ -175,6 +175,7 @@ namespace JMAPI.Controllers
                 ReceiptImagePath = item.ReceiptImagePath,
                 IsReimbursed = item.IsReimbursed,
                 PaymentMethod = item.PaymentMethod,
+                PaidTo = item.PaidTo,
                 Attachments = attachments
             };
         }
