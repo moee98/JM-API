@@ -22,6 +22,7 @@ namespace JMAPI.Services
             var query = _context.Jobs
                 .Include(j => j.Vehicle)
                 .Include(j => j.Customer)
+                .Include(j => j.JobServices).ThenInclude(js => js.Service)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
