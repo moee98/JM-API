@@ -15,6 +15,7 @@ namespace JMAPI.Models
         public string? ReceiptImagePath { get; set; }
         public required bool IsReimbursed { get; set; }
         public required string PaymentMethod { get; set; }
+        public string? PaidTo { get; set; }
         [JsonIgnore]
         public IList<ExpenseItemAttachment> Attachments { get; set; } = [];
     }

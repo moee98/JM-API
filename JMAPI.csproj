@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-OrderManagementAPI-7fadb5fe-230d-4539-9f73-32ffe0d85a80</UserSecretsId>
+    <Version>1.0.0</Version> <!-- x-release-please-version -->
   </PropertyGroup>
 
   <ItemGroup>

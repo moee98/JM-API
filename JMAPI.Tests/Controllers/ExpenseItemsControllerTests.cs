@@ -32,7 +32,8 @@ public sealed class ExpenseItemsControllerTests : IClassFixture<CustomWebApplica
             ExpenseCategoryId = categoryId,
             ReceiptImagePath = "receipt.png",
             IsReimbursed = false,
-            PaymentMethod = "Card"
+            PaymentMethod = "Card",
+            PaidTo = "Acme Supplies"
         };
 
         var response = await client.PostAsJsonAsync("/api/ExpenseItems", request);
@@ -42,6 +43,7 @@ public sealed class ExpenseItemsControllerTests : IClassFixture<CustomWebApplica
         payload.Should().NotBeNull();
         payload!.Description.Should().Be("Cleaning supplies");
         payload.ExpenseCategoryId.Should().Be(categoryId);
+        payload.PaidTo.Should().Be("Acme Supplies");
     }
 
     [Fact]
@@ -75,7 +77,8 @@ public sealed class ExpenseItemsControllerTests : IClassFixture<CustomWebApplica
             DateIncurred = DateTime.UtcNow.Date,
             ExpenseCategoryId = categoryId,
             IsReimbursed = true,
-            PaymentMethod = "Card"
+            PaymentMethod = "Card",
+            PaidTo = "Shell Garage"
         };
 
         var response = await client.PutAsJsonAsync($"/api/ExpenseItems/{expenseItemId}", updateRequest);
@@ -92,6 +95,7 @@ public sealed class ExpenseItemsControllerTests : IClassFixture<CustomWebApplica
             saved.Amount.Should().Be(30);
             saved.IsReimbursed.Should().BeTrue();
             saved.PaymentMethod.Should().Be("Card");
+            saved.PaidTo.Should().Be("Shell Garage");
         });
     }
 
@@ -165,5 +169,6 @@ public sealed class ExpenseItemsControllerTests : IClassFixture<CustomWebApplica
         string? ReceiptImagePath,
         bool IsReimbursed,
         string PaymentMethod,
+        string? PaidTo,
         IReadOnlyList<AttachmentSummaryResponse> Attachments);
 }

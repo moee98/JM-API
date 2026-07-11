@@ -60,6 +60,7 @@ namespace JMAPI.Services
             existing.ReceiptImagePath = item.ReceiptImagePath;
             existing.IsReimbursed = item.IsReimbursed;
             existing.PaymentMethod = item.PaymentMethod;
+            existing.PaidTo = item.PaidTo;
 
             await _context.SaveChangesAsync();
             return true;

@@ -10,6 +10,7 @@ namespace JMAPI.Models
         public string? ReceiptImagePath { get; init; }
         public bool IsReimbursed { get; init; }
         public required string PaymentMethod { get; init; }
+        public string? PaidTo { get; init; }
         public IReadOnlyList<AttachmentSummaryResponse> Attachments { get; init; } = [];
     }
 }
