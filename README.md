@@ -15,7 +15,7 @@ ASP.NET Core Web API powering the [Kaza Dashboard](https://github.com/moee98/JM-
 - **Payments** — multiple payment methods per job with amount tracking
 - **Integrations** — OAuth token storage for eBay and Square
 - **Notifications** — per-user in-app notification management
-- **Authentication** — ASP.NET Core Identity with JWT access tokens (HttpOnly cookies) and refresh tokens
+- **Authentication** — ASP.NET Core Identity with short-lived JWT access tokens (HttpOnly cookies) and per-device refresh tokens; sessions slide forward on every refresh, so users stay signed in until they sign out
 - **Role-based access** — User and Admin roles enforced on endpoints
 
 ## Tech Stack
@@ -90,7 +90,7 @@ docker run -p 5000:5000 kaza-api
 
 | Group | Base path |
 |-------|-----------|
-| Auth | `POST /api/Auth/login`, `POST /api/Auth/register`, `POST /api/Auth/refresh` |
+| Auth | `POST /api/Auth/login`, `POST /api/Auth/register`, `POST /api/Auth/refresh`, `POST /api/Auth/logout`, `POST /api/Auth/logout-all` |
 | Users | `GET /api/Users`, `GET /api/Users/{id}` |
 | Jobs | `GET/POST /api/Job`, `GET/PUT/DELETE /api/Job/{id}`, `POST /api/Job/{id}/send-invoice` |
 | Customers | `GET/POST /api/Customers`, `GET/PUT/DELETE /api/Customers/{id}` |
@@ -104,6 +104,37 @@ docker run -p 5000:5000 kaza-api
 | Notifications | `GET/POST/DELETE /api/Notifications` |
 
 Most endpoints require a valid JWT. Admin-only endpoints are marked with `[Authorize(Roles = "Admin")]`.
+
+## Sessions
+
+Two tokens, with different jobs:
+
+| | Access token | Refresh token |
+|---|---|---|
+| Format | Signed JWT carrying id/email/name/roles | 32 random bytes, stored SHA-256 hashed |
+| Lifetime | 15 minutes (`Services/TokenService.cs`) | `Auth:PersistentRefreshTokenDays` (default 365), sliding |
+| Where it lives | HttpOnly `jwt` cookie — unreadable by JS | `RefreshTokens` table, one row per device |
+
+- **Cookie lifetime is decoupled from token lifetime.** The cookie is only
+  transport; the JWT's own 15-minute expiry is what the auth middleware
+  enforces. Matching the two would delete the cookie at exactly the moment a
+  refresh needs it.
+- **Refresh identifies the session from the refresh token alone**, so a user
+  whose browser dropped the cookie still renews cleanly rather than being
+  signed out.
+- **Sliding window.** Every refresh rotates the token and pushes the expiry
+  out, so an active user stays signed in indefinitely.
+- **One row per device.** Signing in on a phone leaves the desktop signed in.
+  `logout` revokes just the calling device; `logout-all` revokes every session.
+- **Rotation grace.** A just-rotated token keeps working for 60 seconds so two
+  browser tabs racing to refresh don't sign each other out. Replaying a token
+  revoked any earlier is treated as theft and drops every session for that user.
+- **Kill switches.** Deactivating an account or resetting its password revokes
+  all of its sessions; deactivation takes effect within one access-token
+  lifetime.
+
+"Keep me logged in" is sent as `rememberMe` on login. Unticked, the session
+gets `Auth:SessionRefreshTokenDays` (default 1) and a browser-session cookie.
 
 ## Project Structure
 

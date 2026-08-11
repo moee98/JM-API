@@ -4,6 +4,7 @@ using JMAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Security.Claims;
 
 namespace JMAPI.Controllers
@@ -15,6 +16,7 @@ namespace JMAPI.Controllers
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly TokenService _tokenService;
+        private readonly RefreshTokenService _refreshTokenService;
         private readonly IHostEnvironment _env;
         private readonly IConfiguration _config;
         private readonly IEmailService _emailService;
@@ -23,6 +25,7 @@ namespace JMAPI.Controllers
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
             TokenService tokenService,
+            RefreshTokenService refreshTokenService,
             IHostEnvironment env,
             IConfiguration config,
             IEmailService emailService)
@@ -30,6 +33,7 @@ namespace JMAPI.Controllers
             _userManager = userManager;
             _roleManager = roleManager;
             _tokenService = tokenService;
+            _refreshTokenService = refreshTokenService;
             _env = env;
             _config = config;
             _emailService = emailService;
@@ -40,18 +44,34 @@ namespace JMAPI.Controllers
         private bool CookieSecure =>
             _config.GetValue<bool?>("Cookies:Secure") ?? !_env.IsDevelopment();
 
+        private string? DeviceLabel => Request.Headers.UserAgent.ToString();
+
         // Sets the JWT access token as an HTTP-only cookie so it cannot be
         // read or stolen by JavaScript (XSS protection).
-        private void SetJwtCookie(string accessToken)
+        private void SetJwtCookie(string accessToken, bool isPersistent, DateTime sessionExpiresAt)
         {
-            Response.Cookies.Append("jwt", accessToken, new CookieOptions
+            var options = new CookieOptions
             {
                 HttpOnly = true,
                 Secure = CookieSecure,
                 SameSite = SameSiteMode.Strict,
-                MaxAge = TimeSpan.FromMinutes(15),
                 Path = "/"
-            });
+            };
+
+            // The cookie is only transport - the JWT carries its own 15-minute
+            // expiry and is rejected by the auth middleware the moment it
+            // lapses. Giving the cookie the same 15-minute lifetime used to
+            // delete it at exactly the point /auth/refresh needed it, which
+            // signed out anyone who left the app idle for a quarter of an hour.
+            // For a non-persistent session we deliberately omit MaxAge so the
+            // cookie dies with the browser session.
+            if (isPersistent)
+            {
+                var maxAge = sessionExpiresAt - DateTime.UtcNow;
+                options.MaxAge = maxAge > TimeSpan.Zero ? maxAge : TimeSpan.Zero;
+            }
+
+            Response.Cookies.Append("jwt", accessToken, options);
         }
 
         private void ClearJwtCookie()
@@ -125,25 +145,17 @@ namespace JMAPI.Controllers
             }
 
             var claims = await BuildClaimsAsync(user);
-
             var accessToken = _tokenService.GenerateAccessToken(claims);
-            var refreshToken = _tokenService.GenerateRefreshToken();
 
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
-
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
-            {
-                return StatusCode(500, updateResult.Errors);
-            }
+            var session = await _refreshTokenService.IssueAsync(user, model.RememberMe, DeviceLabel);
 
             // Set access token as HTTP-only cookie — never exposed to JavaScript
-            SetJwtCookie(accessToken);
+            SetJwtCookie(accessToken, session.IsPersistent, session.ExpiresAt);
 
             return Ok(new
             {
-                refreshToken,
+                refreshToken = session.RawToken,
+                rememberMe = session.IsPersistent,
                 user = CreateUserResponse(user)
             });
         }
@@ -156,74 +168,80 @@ namespace JMAPI.Controllers
                 return BadRequest("Refresh token is required.");
             }
 
-            // Read the expired access token from the HTTP-only cookie
-            var expiredAccessToken = Request.Cookies["jwt"];
-            if (string.IsNullOrWhiteSpace(expiredAccessToken))
+            // The refresh token alone identifies the session. This deliberately
+            // does not read the jwt cookie: a returning user's cookie may well
+            // have been dropped by the browser, and requiring it here is what
+            // used to turn "idle for a while" into "signed out".
+            var session = await _refreshTokenService.ValidateAndRotateAsync(request.RefreshToken, DeviceLabel);
+            if (!session.Succeeded || session.User is null)
             {
+                ClearJwtCookie();
                 return Unauthorized();
             }
 
-            ClaimsPrincipal principal;
-            try
-            {
-                principal = _tokenService.GetPrincipalFromExpiredToken(expiredAccessToken);
-            }
-            catch
-            {
-                return Unauthorized();
-            }
+            var user = session.User;
 
-            var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            // Re-checked on every refresh so deactivating an account takes
+            // effect within one access-token lifetime rather than never - the
+            // kill switch that makes indefinite sessions safe.
+            if (await _userManager.IsLockedOutAsync(user))
             {
-                return Unauthorized();
-            }
-
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null ||
-                user.RefreshToken != request.RefreshToken ||
-                user.RefreshTokenExpiryTime == null ||
-                user.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                return Unauthorized();
+                await _refreshTokenService.RevokeAllAsync(user.Id, RefreshTokenRevocationReason.SecuritySweep);
+                ClearJwtCookie();
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Your account has been deactivated. Contact an administrator."
+                });
             }
 
             var newClaims = await BuildClaimsAsync(user);
             var newAccessToken = _tokenService.GenerateAccessToken(newClaims);
-            var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            user.RefreshToken = newRefreshToken;
-            // Reset the expiry on every successful refresh so the session is a true
-            // sliding window (an active user is never logged out), not a fixed
-            // expiry counted from the original login.
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
-            {
-                return StatusCode(500, updateResult.Errors);
-            }
 
             // Rotate the access token cookie
-            SetJwtCookie(newAccessToken);
+            SetJwtCookie(newAccessToken, session.IsPersistent, session.ExpiresAt);
 
-            return Ok(new { refreshToken = newRefreshToken });
+            return Ok(new
+            {
+                refreshToken = session.RawToken,
+                rememberMe = session.IsPersistent
+            });
         }
 
         [Authorize]
         [HttpPost("logout")]
-        public async Task<IActionResult> Logout()
+        public async Task<IActionResult> Logout(
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LogoutRequest? request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!string.IsNullOrEmpty(userId))
             {
-                var user = await _userManager.FindByIdAsync(userId);
-                if (user != null)
+                if (!string.IsNullOrWhiteSpace(request?.RefreshToken))
                 {
-                    // Invalidate the stored refresh token so it cannot be reused
-                    user.RefreshToken = null;
-                    user.RefreshTokenExpiryTime = null;
-                    await _userManager.UpdateAsync(user);
+                    // Sign out just this device, leaving the user's other
+                    // sessions alone.
+                    await _refreshTokenService.RevokeAsync(request.RefreshToken, userId);
                 }
+                else
+                {
+                    // No token supplied (older clients) - fall back to signing
+                    // out everywhere rather than leaving a session live.
+                    await _refreshTokenService.RevokeAllAsync(userId);
+                }
+            }
+
+            ClearJwtCookie();
+            return NoContent();
+        }
+
+        /// <summary>Signs the caller out of every device.</summary>
+        [Authorize]
+        [HttpPost("logout-all")]
+        public async Task<IActionResult> LogoutAll()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!string.IsNullOrEmpty(userId))
+            {
+                await _refreshTokenService.RevokeAllAsync(userId);
             }
 
             ClearJwtCookie();
@@ -292,6 +310,11 @@ namespace JMAPI.Controllers
                 }
                 return BadRequest(result.Errors.Select(e => e.Description));
             }
+
+            // Sessions now outlive a password change by default, so a reset has
+            // to sweep them - otherwise resetting a password wouldn't actually
+            // evict whoever the user was resetting it because of.
+            await _refreshTokenService.RevokeAllAsync(user.Id);
 
             return NoContent();
         }
