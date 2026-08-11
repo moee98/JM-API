@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/moee98/JM-API/compare/v1.1.0...v1.2.0) (2026-08-11)
+
+
+### Features
+
+* keep users signed in with per-device refresh tokens ([deb5fd9](https://github.com/moee98/JM-API/commit/deb5fd9c5773744cbfcf887395e9fd9e2fa05060))
+* keep users signed in with per-device refresh tokens ([37c1576](https://github.com/moee98/JM-API/commit/37c157614500738681172e9f4c045c489292d8d3))
+
 ## [1.1.0](https://github.com/moee98/JM-API/compare/v1.0.0...v1.1.0) (2026-07-11)
 
 
