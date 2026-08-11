@@ -98,6 +98,7 @@ builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IJobServicesService, JobServicesService>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<RefreshTokenService>();
 
 // Register the expense items service used by ExpenseItemsController
 builder.Services.AddScoped<IExpenseItemsService, ExpenseItemsService>();

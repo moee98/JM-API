@@ -1,7 +1,6 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace JMAPI.Services
@@ -31,29 +30,9 @@ namespace JMAPI.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        public string GenerateRefreshToken()
-        {
-            var randomNumber = new byte[32];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(randomNumber);
-            return Convert.ToBase64String(randomNumber);
-        }
-
-        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
-        {
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateAudience = true,
-                ValidateIssuer = true,
-                ValidateIssuerSigningKey = true,
-                ValidateLifetime = false, // ignore expiry
-                ValidIssuer = _config["JwtSettings:Issuer"],
-                ValidAudience = _config["JwtSettings:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Key"]!))
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            return tokenHandler.ValidateToken(token, tokenValidationParameters, out _);
-        }
+        // Refresh tokens are issued and rotated by RefreshTokenService, which
+        // owns the RefreshTokens table. Nothing needs to read claims back out
+        // of an expired access token any more - /auth/refresh identifies the
+        // session from the refresh token alone.
     }
 }

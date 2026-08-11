@@ -11,6 +11,28 @@ namespace JMAPI.Database
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {
         }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<RefreshToken>(entity =>
+            {
+                // Refresh is a per-request lookup by hash, so this index is on
+                // the hot path. Unique because a hash collision would let one
+                // session's token authenticate as another's.
+                entity.HasIndex(t => t.TokenHash).IsUnique();
+                entity.Property(t => t.TokenHash).HasMaxLength(64).IsRequired();
+                entity.Property(t => t.DeviceLabel).HasMaxLength(256);
+
+                entity.HasOne(t => t.AppUser)
+                    .WithMany(u => u.RefreshTokens)
+                    .HasForeignKey(t => t.AppUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+        }
+
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Job> Jobs { get; set; }
         public DbSet<Service> Services { get; set; }
         public DbSet<ExpenseItem> ExpenseItems { get; set; }
